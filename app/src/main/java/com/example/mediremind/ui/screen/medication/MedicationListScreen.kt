@@ -105,7 +105,7 @@ private fun sampleMedications(): List<Medication> {
             dosage = "500 mg twice daily",
             currentStockAmount = 18.0,
             stockUnit = "pills",
-            refillAlertAt = 6
+            refillAlertAt = 6.0
         ),
         Medication(
             id = 2,
@@ -114,7 +114,7 @@ private fun sampleMedications(): List<Medication> {
             dosage = "10 mg every morning",
             currentStockAmount = 9.0,
             stockUnit = "pills",
-            refillAlertAt = 3
+            refillAlertAt = 3.0
         ),
         Medication(
             id = 3,
@@ -123,7 +123,7 @@ private fun sampleMedications(): List<Medication> {
             dosage = "10 mL twice daily",
             currentStockAmount = 100.0,
             stockUnit = "mL",
-            refillAlertAt = 30
+            refillAlertAt = 30.0
         )
     )
 }

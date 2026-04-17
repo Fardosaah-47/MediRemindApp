@@ -7,5 +7,5 @@ data class Medication(
     val dosage: String,
     val currentStockAmount: Double,
     val stockUnit: String,
-    val refillAlertAt: Int
+    val refillAlertAt: Double
 )
