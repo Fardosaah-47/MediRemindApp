@@ -73,15 +73,19 @@ fun MedicationListScreen(
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
+                            text = "Form: ${medication.form}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
                             text = "Dosage: ${medication.dosage}",
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
-                            text = "Stock: ${medication.stockCount}",
+                            text = "Stock: ${medication.currentStockAmount} ${medication.stockUnit}",
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
-                            text = "Refill Alert At: ${medication.refillThreshold}",
+                            text = "Refill Alert At: ${medication.refillAlertAt} ${medication.stockUnit}",
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -96,16 +100,29 @@ private fun sampleMedications(): List<Medication> {
         Medication(
             id = 1,
             name = "Metformin",
+            form = "Tablet",
             dosage = "500 mg twice daily",
-            stockCount = 18,
-            refillThreshold = 6
+            currentStockAmount = 18,
+            stockUnit = "pills",
+            refillAlertAt = 6
         ),
         Medication(
             id = 2,
             name = "Amlodipine",
+            form = "Tablet",
             dosage = "10 mg every morning",
-            stockCount = 9,
-            refillThreshold = 3
+            currentStockAmount = 9,
+            stockUnit = "pills",
+            refillAlertAt = 3
+        ),
+        Medication(
+            id = 3,
+            name = "Cough Syrup",
+            form = "Syrup",
+            dosage = "10 mL twice daily",
+            currentStockAmount = 100,
+            stockUnit = "mL",
+            refillAlertAt = 30
         )
     )
 }

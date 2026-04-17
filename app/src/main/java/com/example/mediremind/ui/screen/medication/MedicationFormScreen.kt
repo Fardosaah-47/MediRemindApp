@@ -22,9 +22,11 @@ import com.example.mediremind.ui.theme.MediRemindTheme
 @Composable
 fun MedicationFormScreen(modifier: Modifier = Modifier) {
     val medicationName = remember { mutableStateOf("") }
+    val medicationForm = remember { mutableStateOf("") }
     val dosage = remember { mutableStateOf("") }
-    val stockCount = remember { mutableStateOf("") }
-    val refillThreshold = remember { mutableStateOf("") }
+    val stockAmount = remember { mutableStateOf("") }
+    val stockUnit = remember { mutableStateOf("") }
+    val refillAlertAt = remember { mutableStateOf("") }
 
     Column(
         modifier = modifier
@@ -57,27 +59,45 @@ fun MedicationFormScreen(modifier: Modifier = Modifier) {
         Spacer(modifier = Modifier.height(12.dp))
 
         OutlinedTextField(
+            value = medicationForm.value,
+            onValueChange = { medicationForm.value = it },
+            label = { Text("Medication Form e.g. Tablet, Syrup") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedTextField(
             value = dosage.value,
             onValueChange = { dosage.value = it },
-            label = { Text("Dosage") },
+            label = { Text("Dosage Instructions") },
             modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(12.dp))
 
         OutlinedTextField(
-            value = stockCount.value,
-            onValueChange = { stockCount.value = it },
-            label = { Text("Current Stock") },
+            value = stockAmount.value,
+            onValueChange = { stockAmount.value = it },
+            label = { Text("Current Stock Amount") },
             modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(12.dp))
 
         OutlinedTextField(
-            value = refillThreshold.value,
-            onValueChange = { refillThreshold.value = it },
-            label = { Text("Refill Threshold") },
+            value = stockUnit.value,
+            onValueChange = { stockUnit.value = it },
+            label = { Text("Stock Unit e.g. pills, mL, bottles") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedTextField(
+            value = refillAlertAt.value,
+            onValueChange = { refillAlertAt.value = it },
+            label = { Text("Refill Alert At") },
             modifier = Modifier.fillMaxWidth()
         )
 
