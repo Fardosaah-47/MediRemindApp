@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.mediremind.data.model.Medication
+import com.example.mediremind.data.model.MedicationForm
 import com.example.mediremind.ui.theme.MediRemindTheme
 
 @Composable
@@ -100,27 +101,27 @@ private fun sampleMedications(): List<Medication> {
         Medication(
             id = 1,
             name = "Metformin",
-            form = "Tablet",
+            form = MedicationForm.TABLET,
             dosage = "500 mg twice daily",
-            currentStockAmount = 18,
+            currentStockAmount = 18.0,
             stockUnit = "pills",
             refillAlertAt = 6
         ),
         Medication(
             id = 2,
             name = "Amlodipine",
-            form = "Tablet",
+            form = MedicationForm.TABLET,
             dosage = "10 mg every morning",
-            currentStockAmount = 9,
+            currentStockAmount = 9.0,
             stockUnit = "pills",
             refillAlertAt = 3
         ),
         Medication(
             id = 3,
             name = "Cough Syrup",
-            form = "Syrup",
+            form = MedicationForm.LIQUID,
             dosage = "10 mL twice daily",
-            currentStockAmount = 100,
+            currentStockAmount = 100.0,
             stockUnit = "mL",
             refillAlertAt = 30
         )
