@@ -25,7 +25,9 @@ import com.example.mediremind.ui.theme.MediRemindTheme
 fun HomeScreen(
     modifier: Modifier = Modifier,
     onStartMedicationFlow: () -> Unit = {},
-    onStartScheduleFlow: () -> Unit = {}
+    onStartScheduleFlow: () -> Unit = {},
+    onStartDoseLoggingFlow: () -> Unit = {},
+    onStartQrImportFlow: () -> Unit = {}
 ) {
     Column(
         modifier = modifier
@@ -94,6 +96,18 @@ fun HomeScreen(
 
         Button(onClick = onStartScheduleFlow) {
             Text(text = "Open Schedule Setup")
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(onClick = onStartDoseLoggingFlow) {
+            Text(text = "Open Dose Logging")
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(onClick = onStartQrImportFlow) {
+            Text(text = "Import By QR")
         }
     }
 }
