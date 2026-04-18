@@ -13,6 +13,9 @@ interface DoseScheduleDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDoseSchedule(doseSchedule: DoseSchedule): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDoseSchedules(doseSchedules: List<DoseSchedule>): List<Long>
+
     @Update
     suspend fun updateDoseSchedule(doseSchedule: DoseSchedule)
 

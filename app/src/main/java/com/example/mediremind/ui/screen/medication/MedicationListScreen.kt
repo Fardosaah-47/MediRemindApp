@@ -1,7 +1,9 @@
 package com.example.mediremind.ui.screen.medication
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,6 +29,7 @@ fun MedicationListScreen(
     modifier: Modifier = Modifier,
     medications: List<Medication> = sampleMedications(),
     onAddMedicationClick: () -> Unit = {},
+    onMedicationClick: (Medication) -> Unit = {},
     onBackClick: () -> Unit = {}
 ) {
     Column(
@@ -75,7 +78,8 @@ fun MedicationListScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 12.dp),
+                            .padding(bottom = 12.dp)
+                            .clickable { onMedicationClick(medication) },
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surface
                         )
@@ -103,6 +107,17 @@ fun MedicationListScreen(
                                 text = "Refill Alert At: ${medication.refillAlertAt} ${medication.stockUnit}",
                                 style = MaterialTheme.typography.bodyMedium
                             )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                Text(
+                                    text = ">",
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                     }
                 }

@@ -14,4 +14,8 @@ class MedicationRepository(context: Context) {
     suspend fun insertMedication(medication: Medication): Long {
         return medicationDao.insertMedication(medication)
     }
+
+    suspend fun updateMedication(medication: Medication) {
+        medicationDao.updateMedication(medication)
+    }
 }

@@ -24,15 +24,29 @@ import com.example.mediremind.ui.theme.MediRemindTheme
 @Composable
 fun MedicationFormScreen(
     modifier: Modifier = Modifier,
+    existingMedication: Medication? = null,
     onSaveMedication: (Medication) -> Unit = {},
     onCancel: () -> Unit = {}
 ) {
-    val medicationName = remember { mutableStateOf("") }
-    val medicationForm = remember { mutableStateOf("") }
-    val dosage = remember { mutableStateOf("") }
-    val stockAmount = remember { mutableStateOf("") }
-    val stockUnit = remember { mutableStateOf("") }
-    val refillAlertAt = remember { mutableStateOf("") }
+    val medicationName = remember(existingMedication?.id) {
+        mutableStateOf(existingMedication?.name.orEmpty())
+    }
+    val medicationForm = remember(existingMedication?.id) {
+        mutableStateOf(existingMedication?.form?.displayName().orEmpty())
+    }
+    val dosage = remember(existingMedication?.id) {
+        mutableStateOf(existingMedication?.dosage.orEmpty())
+    }
+    val stockAmount = remember(existingMedication?.id) {
+        mutableStateOf(existingMedication?.currentStockAmount?.toString().orEmpty())
+    }
+    val stockUnit = remember(existingMedication?.id) {
+        mutableStateOf(existingMedication?.stockUnit.orEmpty())
+    }
+    val refillAlertAt = remember(existingMedication?.id) {
+        mutableStateOf(existingMedication?.refillAlertAt?.toString().orEmpty())
+    }
+    val isEditing = existingMedication != null
 
     Column(
         modifier = modifier
@@ -41,7 +55,7 @@ fun MedicationFormScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "Add Medication",
+            text = if (isEditing) "Edit Medication" else "Add Medication",
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.primary
         )
@@ -49,7 +63,11 @@ fun MedicationFormScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Enter medication details for reminders and refill tracking.",
+            text = if (isEditing) {
+                "Update medication details so reminders and refill tracking stay accurate."
+            } else {
+                "Enter medication details for reminders and refill tracking."
+            },
             style = MaterialTheme.typography.bodyMedium
         )
 
@@ -112,6 +130,7 @@ fun MedicationFormScreen(
         Button(
             onClick = {
                 val medication = Medication(
+                    id = existingMedication?.id ?: 0,
                     name = medicationName.value.ifBlank { "Untitled Medication" },
                     form = parseMedicationForm(medicationForm.value),
                     dosage = dosage.value.ifBlank { "Not specified" },
@@ -123,7 +142,7 @@ fun MedicationFormScreen(
             },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(text = "Save Medication")
+            Text(text = if (isEditing) "Update Medication" else "Save Medication")
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -145,6 +164,10 @@ private fun parseMedicationForm(input: String): MedicationForm {
         "injection", "injectable" -> MedicationForm.INJECTION
         else -> MedicationForm.OTHER
     }
+}
+
+private fun MedicationForm.displayName(): String {
+    return name.lowercase().replaceFirstChar { it.uppercase() }
 }
 
 @Preview(showBackground = true)

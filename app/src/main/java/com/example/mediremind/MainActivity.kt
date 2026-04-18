@@ -46,6 +46,7 @@ class MainActivity : ComponentActivity() {
             var currentScreen by remember { mutableStateOf(AppScreen.HOME) }
             var medications by remember { mutableStateOf<List<Medication>>(emptyList()) }
             var schedules by remember { mutableStateOf<List<DoseSchedule>>(emptyList()) }
+            var selectedMedication by remember { mutableStateOf<Medication?>(null) }
             val coroutineScope = rememberCoroutineScope()
 
             LaunchedEffect(currentScreen) {
@@ -69,6 +70,7 @@ class MainActivity : ComponentActivity() {
                         currentScreen = currentScreen,
                         medications = medications,
                         schedules = schedules,
+                        selectedMedication = selectedMedication,
                         onStartMedicationFlow = {
                             currentScreen = AppScreen.MEDICATION_LIST
                         },
@@ -76,6 +78,11 @@ class MainActivity : ComponentActivity() {
                             currentScreen = AppScreen.SCHEDULE_LIST
                         },
                         onOpenMedicationForm = {
+                            selectedMedication = null
+                            currentScreen = AppScreen.MEDICATION_FORM
+                        },
+                        onOpenMedicationEditor = { medication ->
+                            selectedMedication = medication
                             currentScreen = AppScreen.MEDICATION_FORM
                         },
                         onOpenScheduleForm = {
@@ -85,21 +92,27 @@ class MainActivity : ComponentActivity() {
                             currentScreen = AppScreen.HOME
                         },
                         onCancelMedicationForm = {
+                            selectedMedication = null
                             currentScreen = AppScreen.MEDICATION_LIST
                         },
                         onSaveMedication = { medication ->
                             coroutineScope.launch {
-                                medicationRepository.insertMedication(medication)
+                                if (medication.id == 0L) {
+                                    medicationRepository.insertMedication(medication)
+                                } else {
+                                    medicationRepository.updateMedication(medication)
+                                }
                                 medications = medicationRepository.getAllMedications()
+                                selectedMedication = null
                                 currentScreen = AppScreen.MEDICATION_LIST
                             }
                         },
                         onCancelScheduleForm = {
                             currentScreen = AppScreen.SCHEDULE_LIST
                         },
-                        onSaveSchedule = { schedule ->
+                        onSaveSchedules = { newSchedules ->
                             coroutineScope.launch {
-                                doseScheduleRepository.insertDoseSchedule(schedule)
+                                doseScheduleRepository.insertDoseSchedules(newSchedules)
                                 schedules = doseScheduleRepository.getAllDoseSchedules()
                                 currentScreen = AppScreen.SCHEDULE_LIST
                             }
@@ -117,15 +130,17 @@ private fun AppContent(
     currentScreen: AppScreen,
     medications: List<Medication>,
     schedules: List<DoseSchedule>,
+    selectedMedication: Medication?,
     onStartMedicationFlow: () -> Unit,
     onStartScheduleFlow: () -> Unit,
     onOpenMedicationForm: () -> Unit,
+    onOpenMedicationEditor: (Medication) -> Unit,
     onOpenScheduleForm: () -> Unit,
     onBackHome: () -> Unit,
     onCancelMedicationForm: () -> Unit,
     onSaveMedication: (Medication) -> Unit,
     onCancelScheduleForm: () -> Unit,
-    onSaveSchedule: (DoseSchedule) -> Unit
+    onSaveSchedules: (List<DoseSchedule>) -> Unit
 ) {
     when (currentScreen) {
         AppScreen.HOME -> {
@@ -141,6 +156,7 @@ private fun AppContent(
                 modifier = modifier,
                 medications = medications,
                 onAddMedicationClick = onOpenMedicationForm,
+                onMedicationClick = onOpenMedicationEditor,
                 onBackClick = onBackHome
             )
         }
@@ -148,6 +164,7 @@ private fun AppContent(
         AppScreen.MEDICATION_FORM -> {
             MedicationFormScreen(
                 modifier = modifier,
+                existingMedication = selectedMedication,
                 onSaveMedication = onSaveMedication,
                 onCancel = onCancelMedicationForm
             )
@@ -173,7 +190,7 @@ private fun AppContent(
             DoseScheduleFormScreen(
                 modifier = modifier,
                 medications = medications,
-                onSaveSchedule = onSaveSchedule,
+                onSaveSchedules = onSaveSchedules,
                 onCancel = onCancelScheduleForm
             )
         }

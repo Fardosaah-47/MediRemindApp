@@ -14,4 +14,8 @@ class DoseScheduleRepository(context: Context) {
     suspend fun insertDoseSchedule(doseSchedule: DoseSchedule): Long {
         return doseScheduleDao.insertDoseSchedule(doseSchedule)
     }
+
+    suspend fun insertDoseSchedules(doseSchedules: List<DoseSchedule>): List<Long> {
+        return doseScheduleDao.insertDoseSchedules(doseSchedules)
+    }
 }
