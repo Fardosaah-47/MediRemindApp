@@ -25,7 +25,9 @@ import com.example.mediremind.ui.theme.MediRemindTheme
 @Composable
 fun MedicationListScreen(
     modifier: Modifier = Modifier,
-    medications: List<Medication> = sampleMedications()
+    medications: List<Medication> = sampleMedications(),
+    onAddMedicationClick: () -> Unit = {},
+    onBackClick: () -> Unit = {}
 ) {
     Column(
         modifier = modifier
@@ -48,47 +50,60 @@ fun MedicationListScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        Button(onClick = { }) {
+        Button(onClick = onAddMedicationClick) {
             Text(text = "Add New Medication")
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(onClick = onBackClick) {
+            Text(text = "Back To Home")
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            items(medications) { medication ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
+        if (medications.isEmpty()) {
+            Text(
+                text = "No medications saved yet. Tap Add New Medication to create your first record.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(medications) { medication ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        )
                     ) {
-                        Text(
-                            text = medication.name,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            text = "Form: ${medication.form}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = "Dosage: ${medication.dosage}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = "Stock: ${medication.currentStockAmount} ${medication.stockUnit}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = "Refill Alert At: ${medication.refillAlertAt} ${medication.stockUnit}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        Column(
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Text(
+                                text = medication.name,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = "Form: ${medication.form.name.lowercase().replaceFirstChar { it.uppercase() }}",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = "Dosage: ${medication.dosage}",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = "Stock: ${medication.currentStockAmount} ${medication.stockUnit}",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = "Refill Alert At: ${medication.refillAlertAt} ${medication.stockUnit}",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
                     }
                 }
             }

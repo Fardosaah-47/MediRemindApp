@@ -22,7 +22,10 @@ import androidx.compose.ui.unit.dp
 import com.example.mediremind.ui.theme.MediRemindTheme
 
 @Composable
-fun HomeScreen(modifier: Modifier = Modifier) {
+fun HomeScreen(
+    modifier: Modifier = Modifier,
+    onStartMedicationFlow: () -> Unit = {}
+) {
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -82,8 +85,8 @@ fun HomeScreen(modifier: Modifier = Modifier) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Button(onClick = { }) {
-            Text(text = "Build Patient Profile Next")
+        Button(onClick = onStartMedicationFlow) {
+            Text(text = "Open Medication Setup")
         }
     }
 }

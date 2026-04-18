@@ -17,10 +17,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.mediremind.data.model.Medication
+import com.example.mediremind.data.model.MedicationForm
 import com.example.mediremind.ui.theme.MediRemindTheme
 
 @Composable
-fun MedicationFormScreen(modifier: Modifier = Modifier) {
+fun MedicationFormScreen(
+    modifier: Modifier = Modifier,
+    onSaveMedication: (Medication) -> Unit = {},
+    onCancel: () -> Unit = {}
+) {
     val medicationName = remember { mutableStateOf("") }
     val medicationForm = remember { mutableStateOf("") }
     val dosage = remember { mutableStateOf("") }
@@ -104,11 +110,40 @@ fun MedicationFormScreen(modifier: Modifier = Modifier) {
         Spacer(modifier = Modifier.height(20.dp))
 
         Button(
-            onClick = { },
+            onClick = {
+                val medication = Medication(
+                    name = medicationName.value.ifBlank { "Untitled Medication" },
+                    form = parseMedicationForm(medicationForm.value),
+                    dosage = dosage.value.ifBlank { "Not specified" },
+                    currentStockAmount = stockAmount.value.toDoubleOrNull() ?: 0.0,
+                    stockUnit = stockUnit.value.ifBlank { "units" },
+                    refillAlertAt = refillAlertAt.value.toDoubleOrNull() ?: 0.0
+                )
+                onSaveMedication(medication)
+            },
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(text = "Save Medication")
         }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(
+            onClick = onCancel,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(text = "Cancel")
+        }
+    }
+}
+
+private fun parseMedicationForm(input: String): MedicationForm {
+    return when (input.trim().lowercase()) {
+        "tablet", "pill", "pills" -> MedicationForm.TABLET
+        "capsule", "capsules" -> MedicationForm.CAPSULE
+        "liquid", "syrup" -> MedicationForm.LIQUID
+        "injection", "injectable" -> MedicationForm.INJECTION
+        else -> MedicationForm.OTHER
     }
 }
 
