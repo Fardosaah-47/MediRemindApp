@@ -24,7 +24,8 @@ import com.example.mediremind.ui.theme.MediRemindTheme
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
-    onStartMedicationFlow: () -> Unit = {}
+    onStartMedicationFlow: () -> Unit = {},
+    onStartScheduleFlow: () -> Unit = {}
 ) {
     Column(
         modifier = modifier
@@ -87,6 +88,12 @@ fun HomeScreen(
 
         Button(onClick = onStartMedicationFlow) {
             Text(text = "Open Medication Setup")
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(onClick = onStartScheduleFlow) {
+            Text(text = "Open Schedule Setup")
         }
     }
 }

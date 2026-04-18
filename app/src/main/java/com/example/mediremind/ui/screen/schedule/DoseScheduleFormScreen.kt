@@ -17,10 +17,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.mediremind.data.model.DoseFrequency
+import com.example.mediremind.data.model.DoseSchedule
+import com.example.mediremind.data.model.Medication
 import com.example.mediremind.ui.theme.MediRemindTheme
 
 @Composable
-fun DoseScheduleFormScreen(modifier: Modifier = Modifier) {
+fun DoseScheduleFormScreen(
+    modifier: Modifier = Modifier,
+    medications: List<Medication> = emptyList(),
+    onSaveSchedule: (DoseSchedule) -> Unit = {},
+    onCancel: () -> Unit = {}
+) {
     val medicationName = remember { mutableStateOf("") }
     val reminderTime = remember { mutableStateOf("") }
     val frequency = remember { mutableStateOf("") }
@@ -74,11 +82,44 @@ fun DoseScheduleFormScreen(modifier: Modifier = Modifier) {
         Spacer(modifier = Modifier.height(20.dp))
 
         Button(
-            onClick = { },
+            onClick = {
+                val matchedMedication = medications.firstOrNull {
+                    it.name.equals(medicationName.value.trim(), ignoreCase = true)
+                }
+
+                if (matchedMedication != null) {
+                    val schedule = DoseSchedule(
+                        medicationId = matchedMedication.id,
+                        time = reminderTime.value.ifBlank { "08:00 AM" },
+                        frequency = parseDoseFrequency(frequency.value)
+                    )
+                    onSaveSchedule(schedule)
+                }
+            },
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(text = "Save Schedule")
         }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(
+            onClick = onCancel,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(text = "Cancel")
+        }
+    }
+}
+
+private fun parseDoseFrequency(input: String): DoseFrequency {
+    return when (input.trim().lowercase()) {
+        "once", "once daily", "daily" -> DoseFrequency.ONCE_DAILY
+        "twice", "twice daily" -> DoseFrequency.TWICE_DAILY
+        "three times", "three times daily" -> DoseFrequency.THREE_TIMES_DAILY
+        "weekly" -> DoseFrequency.WEEKLY
+        "as needed", "prn" -> DoseFrequency.AS_NEEDED
+        else -> DoseFrequency.ONCE_DAILY
     }
 }
 

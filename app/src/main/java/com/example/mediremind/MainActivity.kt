@@ -15,18 +15,25 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.example.mediremind.data.model.DoseSchedule
 import com.example.mediremind.data.model.Medication
+import com.example.mediremind.data.repository.DoseScheduleRepository
 import com.example.mediremind.data.repository.MedicationRepository
 import com.example.mediremind.ui.screen.home.HomeScreen
 import com.example.mediremind.ui.screen.medication.MedicationFormScreen
 import com.example.mediremind.ui.screen.medication.MedicationListScreen
+import com.example.mediremind.ui.screen.schedule.DoseScheduleFormScreen
+import com.example.mediremind.ui.screen.schedule.ScheduleDisplayItem
+import com.example.mediremind.ui.screen.schedule.ScheduleListScreen
 import com.example.mediremind.ui.theme.MediRemindTheme
 import kotlinx.coroutines.launch
 
 private enum class AppScreen {
     HOME,
     MEDICATION_LIST,
-    MEDICATION_FORM
+    MEDICATION_FORM,
+    SCHEDULE_LIST,
+    SCHEDULE_FORM
 }
 
 class MainActivity : ComponentActivity() {
@@ -35,13 +42,21 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val medicationRepository = remember { MedicationRepository(applicationContext) }
+            val doseScheduleRepository = remember { DoseScheduleRepository(applicationContext) }
             var currentScreen by remember { mutableStateOf(AppScreen.HOME) }
             var medications by remember { mutableStateOf<List<Medication>>(emptyList()) }
+            var schedules by remember { mutableStateOf<List<DoseSchedule>>(emptyList()) }
             val coroutineScope = rememberCoroutineScope()
 
             LaunchedEffect(currentScreen) {
                 if (currentScreen == AppScreen.MEDICATION_LIST) {
                     medications = medicationRepository.getAllMedications()
+                }
+                if (currentScreen == AppScreen.SCHEDULE_LIST || currentScreen == AppScreen.SCHEDULE_FORM) {
+                    medications = medicationRepository.getAllMedications()
+                }
+                if (currentScreen == AppScreen.SCHEDULE_LIST) {
+                    schedules = doseScheduleRepository.getAllDoseSchedules()
                 }
             }
 
@@ -53,11 +68,18 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.padding(innerPadding),
                         currentScreen = currentScreen,
                         medications = medications,
+                        schedules = schedules,
                         onStartMedicationFlow = {
                             currentScreen = AppScreen.MEDICATION_LIST
                         },
+                        onStartScheduleFlow = {
+                            currentScreen = AppScreen.SCHEDULE_LIST
+                        },
                         onOpenMedicationForm = {
                             currentScreen = AppScreen.MEDICATION_FORM
+                        },
+                        onOpenScheduleForm = {
+                            currentScreen = AppScreen.SCHEDULE_FORM
                         },
                         onBackHome = {
                             currentScreen = AppScreen.HOME
@@ -70,6 +92,16 @@ class MainActivity : ComponentActivity() {
                                 medicationRepository.insertMedication(medication)
                                 medications = medicationRepository.getAllMedications()
                                 currentScreen = AppScreen.MEDICATION_LIST
+                            }
+                        },
+                        onCancelScheduleForm = {
+                            currentScreen = AppScreen.SCHEDULE_LIST
+                        },
+                        onSaveSchedule = { schedule ->
+                            coroutineScope.launch {
+                                doseScheduleRepository.insertDoseSchedule(schedule)
+                                schedules = doseScheduleRepository.getAllDoseSchedules()
+                                currentScreen = AppScreen.SCHEDULE_LIST
                             }
                         }
                     )
@@ -84,17 +116,23 @@ private fun AppContent(
     modifier: Modifier = Modifier,
     currentScreen: AppScreen,
     medications: List<Medication>,
+    schedules: List<DoseSchedule>,
     onStartMedicationFlow: () -> Unit,
+    onStartScheduleFlow: () -> Unit,
     onOpenMedicationForm: () -> Unit,
+    onOpenScheduleForm: () -> Unit,
     onBackHome: () -> Unit,
     onCancelMedicationForm: () -> Unit,
-    onSaveMedication: (Medication) -> Unit
+    onSaveMedication: (Medication) -> Unit,
+    onCancelScheduleForm: () -> Unit,
+    onSaveSchedule: (DoseSchedule) -> Unit
 ) {
     when (currentScreen) {
         AppScreen.HOME -> {
             HomeScreen(
                 modifier = modifier,
-                onStartMedicationFlow = onStartMedicationFlow
+                onStartMedicationFlow = onStartMedicationFlow,
+                onStartScheduleFlow = onStartScheduleFlow
             )
         }
 
@@ -112,6 +150,31 @@ private fun AppContent(
                 modifier = modifier,
                 onSaveMedication = onSaveMedication,
                 onCancel = onCancelMedicationForm
+            )
+        }
+
+        AppScreen.SCHEDULE_LIST -> {
+            ScheduleListScreen(
+                modifier = modifier,
+                schedules = schedules.map { schedule ->
+                    ScheduleDisplayItem(
+                        medicationName = medications.firstOrNull { it.id == schedule.medicationId }?.name
+                            ?: "Unknown Medication",
+                        reminderTime = schedule.time,
+                        frequency = schedule.frequency
+                    )
+                },
+                onAddScheduleClick = onOpenScheduleForm,
+                onBackClick = onBackHome
+            )
+        }
+
+        AppScreen.SCHEDULE_FORM -> {
+            DoseScheduleFormScreen(
+                modifier = modifier,
+                medications = medications,
+                onSaveSchedule = onSaveSchedule,
+                onCancel = onCancelScheduleForm
             )
         }
     }
