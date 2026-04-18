@@ -29,6 +29,7 @@ data class DoseLog(
     val doseScheduleId: Long,
     val medicationId: Long,
     val scheduledTime: String,
+    val logDate: String,
     val status: DoseStatus,
     val takenAt: String? = null,
     val imageUri: String? = null

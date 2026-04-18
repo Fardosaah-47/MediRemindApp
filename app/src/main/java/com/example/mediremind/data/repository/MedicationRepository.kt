@@ -18,4 +18,8 @@ class MedicationRepository(context: Context) {
     suspend fun updateMedication(medication: Medication) {
         medicationDao.updateMedication(medication)
     }
+
+    suspend fun deleteMedication(medication: Medication) {
+        medicationDao.deleteMedication(medication)
+    }
 }

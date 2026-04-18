@@ -15,9 +15,14 @@ data class QrMedicationPayload(
     val times: List<String>
 )
 
+data class QrImportResult(
+    val insertedMedicationIds: List<Long>,
+    val autoScheduledCount: Int
+)
+
 object QrImportParser {
     fun parse(rawValue: String): QrImportPayload {
-        val normalizedValue = rawValue.trim()
+        val normalizedValue = extractJsonPayload(rawValue.trim())
 
         require(!normalizedValue.startsWith("http", ignoreCase = true)) {
             "This QR contains a website link, not medication data."
@@ -57,7 +62,8 @@ object QrImportParser {
                             dosage = item.optString("dosage").ifBlank { "Not specified" },
                             currentStockAmount = item.optDouble("stockAmount", 0.0),
                             stockUnit = item.optString("stockUnit").ifBlank { "units" },
-                            refillAlertAt = item.optDouble("refillAlertAt", 0.0)
+                            refillAlertAt = item.optDouble("refillAlertAt", 0.0),
+                            isQrImported = true
                         ),
                         frequency = parseDoseFrequency(item.optString("frequency")),
                         times = times
@@ -92,5 +98,20 @@ object QrImportParser {
             "AS_NEEDED" -> DoseFrequency.AS_NEEDED
             else -> DoseFrequency.ONCE_DAILY
         }
+    }
+
+    private fun extractJsonPayload(rawValue: String): String {
+        if (rawValue.startsWith("{") && rawValue.endsWith("}")) {
+            return rawValue
+        }
+
+        val firstBraceIndex = rawValue.indexOf('{')
+        val lastBraceIndex = rawValue.lastIndexOf('}')
+
+        require(firstBraceIndex >= 0 && lastBraceIndex > firstBraceIndex) {
+            "QR code does not contain valid medication JSON."
+        }
+
+        return rawValue.substring(firstBraceIndex, lastBraceIndex + 1)
     }
 }

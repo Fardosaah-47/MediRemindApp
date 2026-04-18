@@ -12,5 +12,7 @@ data class Medication(
     val dosage: String,
     val currentStockAmount: Double,
     val stockUnit: String,
-    val refillAlertAt: Double
+    val refillAlertAt: Double,
+    val referenceImageUri: String? = null,
+    val isQrImported: Boolean = false
 )

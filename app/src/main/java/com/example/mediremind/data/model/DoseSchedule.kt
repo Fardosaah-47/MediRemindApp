@@ -22,5 +22,7 @@ data class DoseSchedule(
     val id: Long = 0,
     val medicationId: Long,
     val time: String,
-    val frequency: DoseFrequency
+    val frequency: DoseFrequency,
+    val startDate: String = "",
+    val endDate: String = ""
 )

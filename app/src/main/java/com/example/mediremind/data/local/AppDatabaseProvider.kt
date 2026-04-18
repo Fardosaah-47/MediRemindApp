@@ -2,10 +2,47 @@ package com.example.mediremind.data.local
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 object AppDatabaseProvider {
     @Volatile
     private var INSTANCE: AppDatabase? = null
+
+    private val MIGRATION_1_2 = object : Migration(1, 2) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL(
+                "ALTER TABLE medications ADD COLUMN referenceImageUri TEXT"
+            )
+        }
+    }
+
+    private val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL(
+                "ALTER TABLE dose_logs ADD COLUMN logDate TEXT NOT NULL DEFAULT ''"
+            )
+        }
+    }
+
+    private val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL(
+                "ALTER TABLE dose_schedules ADD COLUMN startDate TEXT NOT NULL DEFAULT ''"
+            )
+            database.execSQL(
+                "ALTER TABLE dose_schedules ADD COLUMN endDate TEXT NOT NULL DEFAULT ''"
+            )
+        }
+    }
+
+    private val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL(
+                "ALTER TABLE medications ADD COLUMN isQrImported INTEGER NOT NULL DEFAULT 0"
+            )
+        }
+    }
 
     fun getDatabase(context: Context): AppDatabase {
         return INSTANCE ?: synchronized(this) {
@@ -13,7 +50,13 @@ object AppDatabaseProvider {
                 context.applicationContext,
                 AppDatabase::class.java,
                 "mediremind_database"
-            ).build().also { INSTANCE = it }
+            )
+                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_2_3)
+                .addMigrations(MIGRATION_3_4)
+                .addMigrations(MIGRATION_4_5)
+                .build()
+                .also { INSTANCE = it }
         }
     }
 }

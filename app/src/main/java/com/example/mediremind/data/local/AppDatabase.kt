@@ -10,7 +10,7 @@ import com.example.mediremind.data.model.UserProfile
 
 @Database(
     entities = [UserProfile::class, Medication::class, DoseSchedule::class, DoseLog::class],
-    version = 1,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

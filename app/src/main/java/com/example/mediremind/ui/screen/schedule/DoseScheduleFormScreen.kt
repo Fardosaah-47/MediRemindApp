@@ -1,6 +1,9 @@
 package com.example.mediremind.ui.screen.schedule
 
+import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -9,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -18,6 +23,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
@@ -30,6 +36,7 @@ import com.example.mediremind.data.model.Medication
 import com.example.mediremind.ui.theme.MediRemindTheme
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -37,31 +44,83 @@ import java.util.Locale
 fun DoseScheduleFormScreen(
     modifier: Modifier = Modifier,
     medications: List<Medication> = emptyList(),
+    existingSchedule: DoseSchedule? = null,
     onSaveSchedules: (List<DoseSchedule>) -> Unit = {},
     onCancel: () -> Unit = {}
 ) {
-    val selectedMedicationId = remember { mutableStateOf<Long?>(null) }
-    val selectedFrequency = remember { mutableStateOf(DoseFrequency.ONCE_DAILY) }
-    val firstReminderTime = remember { mutableStateOf("") }
-    val secondReminderTime = remember { mutableStateOf("") }
-    val thirdReminderTime = remember { mutableStateOf("") }
+    val selectedMedicationId = remember(existingSchedule?.id) {
+        mutableStateOf<Long?>(existingSchedule?.medicationId)
+    }
+    val selectedFrequency = remember(existingSchedule?.id) {
+        mutableStateOf(existingSchedule?.frequency ?: DoseFrequency.ONCE_DAILY)
+    }
+    val firstReminderTime = remember(existingSchedule?.id) {
+        mutableStateOf(existingSchedule?.time ?: defaultTimesFor(DoseFrequency.ONCE_DAILY).first())
+    }
+    val secondReminderTime = remember(existingSchedule?.id) {
+        mutableStateOf("")
+    }
+    val thirdReminderTime = remember(existingSchedule?.id) {
+        mutableStateOf("")
+    }
+    val startDate = remember(existingSchedule?.id) {
+        mutableStateOf(existingSchedule?.startDate ?: addDaysToDate(todayDateOnly(), 1))
+    }
+    val endDate = remember(existingSchedule?.id) {
+        mutableStateOf(existingSchedule?.endDate ?: addDaysToDate(todayDateOnly(), 13))
+    }
     val medicationMenuExpanded = remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val isEditing = existingSchedule != null
 
     val selectedMedicationName = medications.firstOrNull { it.id == selectedMedicationId.value }?.name
         ?: "Tap to choose medication"
-    val firstTimeLabel = firstTimeLabel(selectedFrequency.value)
+    val firstTimeLabel = if (isEditing) "Reminder Time" else firstTimeLabel(selectedFrequency.value)
     val secondTimeLabel = secondTimeLabel(selectedFrequency.value)
     val thirdTimeLabel = thirdTimeLabel(selectedFrequency.value)
+    val hasValidTreatmentPeriod = isDateRangeValid(
+        startDate = startDate.value,
+        endDate = endDate.value
+    )
+    val selectedMedication = medications.firstOrNull { it.id == selectedMedicationId.value }
+    val estimatedScheduleSummary = buildEstimatedScheduleSummary(
+        medication = selectedMedication,
+        frequency = selectedFrequency.value,
+        startDate = startDate.value,
+        firstReminderTime = firstReminderTime.value,
+        secondReminderTime = secondReminderTime.value,
+        thirdReminderTime = thirdReminderTime.value
+    )
+    val frequencyMismatchWarning = selectedMedication?.dosage?.let { dosage ->
+        buildFrequencyMismatchWarning(
+            dosageText = dosage,
+            selectedFrequency = selectedFrequency.value
+        )
+    }
+
+    LaunchedEffect(selectedFrequency.value, existingSchedule?.id) {
+        if (!isEditing) {
+            applyDefaultTimes(
+                frequency = selectedFrequency.value,
+                firstReminderTime = firstReminderTime.value,
+                secondReminderTime = secondReminderTime.value,
+                thirdReminderTime = thirdReminderTime.value,
+                onFirstTime = { firstReminderTime.value = it },
+                onSecondTime = { secondReminderTime.value = it },
+                onThirdTime = { thirdReminderTime.value = it }
+            )
+        }
+    }
 
     Column(
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Top
     ) {
         Text(
-            text = "Dose Schedule",
+            text = if (isEditing) "Edit Schedule" else "Dose Schedule",
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.primary
         )
@@ -69,7 +128,11 @@ fun DoseScheduleFormScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Set when the patient should take each medication.",
+            text = if (isEditing) {
+                "Correct the reminder time or treatment period for this saved schedule."
+            } else {
+                "Set when the patient should take each medication."
+            },
             style = MaterialTheme.typography.bodyMedium
         )
 
@@ -122,6 +185,23 @@ fun DoseScheduleFormScreen(
                 }
             }
         }
+        if (!isEditing) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Default times load automatically. You can still tap and change them.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        if (!frequencyMismatchWarning.isNullOrBlank()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = frequencyMismatchWarning,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
 
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -155,6 +235,54 @@ fun DoseScheduleFormScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        Text(
+            text = "Treatment Period",
+            style = MaterialTheme.typography.titleMedium
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedButton(
+            onClick = {
+                openDatePicker(
+                    context = context,
+                    initialValue = startDate.value
+                ) { selectedDate ->
+                    startDate.value = selectedDate
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(text = "Start Date: ${formatDateForDisplay(startDate.value)}")
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedButton(
+            onClick = {
+                openDatePicker(
+                    context = context,
+                    initialValue = endDate.value
+                ) { selectedDate ->
+                    endDate.value = selectedDate
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(text = "End Date: ${formatDateForDisplay(endDate.value)}")
+        }
+
+        if (!hasValidTreatmentPeriod) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "End date must be the same day as the start date or later.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
         OutlinedButton(
             onClick = {
                 openTimePicker(
@@ -175,9 +303,10 @@ fun DoseScheduleFormScreen(
             )
         }
 
-        if (selectedFrequency.value == DoseFrequency.TWICE_DAILY ||
+        if (!isEditing && (
+            selectedFrequency.value == DoseFrequency.TWICE_DAILY ||
             selectedFrequency.value == DoseFrequency.THREE_TIMES_DAILY
-        ) {
+        )) {
             Spacer(modifier = Modifier.height(12.dp))
 
             OutlinedButton(
@@ -201,7 +330,7 @@ fun DoseScheduleFormScreen(
             }
         }
 
-        if (selectedFrequency.value == DoseFrequency.THREE_TIMES_DAILY) {
+        if (!isEditing && selectedFrequency.value == DoseFrequency.THREE_TIMES_DAILY) {
             Spacer(modifier = Modifier.height(12.dp))
 
             OutlinedButton(
@@ -227,6 +356,50 @@ fun DoseScheduleFormScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
+        estimatedScheduleSummary?.let { summary ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "Estimated Plan",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = summary.startLabel,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = summary.endLabel,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = summary.refillLabel,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "This estimate can change later if real dose logs show missed or skipped doses.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+        }
+
         Button(
             onClick = {
                 val medicationId = selectedMedicationId.value
@@ -239,20 +412,24 @@ fun DoseScheduleFormScreen(
 
                     val schedules = times.map { time ->
                         DoseSchedule(
+                            id = existingSchedule?.id ?: 0,
                             medicationId = medicationId,
                             time = time,
-                            frequency = selectedFrequency.value
+                            frequency = selectedFrequency.value,
+                            startDate = startDate.value,
+                            endDate = endDate.value
                         )
                     }
 
-                    if (schedules.isNotEmpty()) {
+                    if (schedules.isNotEmpty() && hasValidTreatmentPeriod) {
                         onSaveSchedules(schedules)
                     }
                 }
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            enabled = hasValidTreatmentPeriod
         ) {
-            Text(text = "Save Schedule")
+            Text(text = if (isEditing) "Update Schedule" else "Save Schedule")
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -295,6 +472,29 @@ private fun openTimePicker(
     ).show()
 }
 
+private fun openDatePicker(
+    context: android.content.Context,
+    initialValue: String,
+    onDateSelected: (String) -> Unit
+) {
+    val calendar = parseDateValue(initialValue) ?: Calendar.getInstance()
+
+    DatePickerDialog(
+        context,
+        { _, year, month, dayOfMonth ->
+            val selectedCalendar = Calendar.getInstance().apply {
+                set(Calendar.YEAR, year)
+                set(Calendar.MONTH, month)
+                set(Calendar.DAY_OF_MONTH, dayOfMonth)
+            }
+            onDateSelected(dateOnlyFormatter().format(selectedCalendar.time))
+        },
+        calendar.get(Calendar.YEAR),
+        calendar.get(Calendar.MONTH),
+        calendar.get(Calendar.DAY_OF_MONTH)
+    ).show()
+}
+
 private fun parseHourMinute(value: String): Pair<Int, Int>? {
     if (value.isBlank()) return null
 
@@ -314,6 +514,194 @@ private fun formatTime(hour: Int, minute: Int): String {
         set(Calendar.MINUTE, minute)
     }
     return SimpleDateFormat("hh:mm a", Locale.getDefault()).format(calendar.time)
+}
+
+private fun todayDateOnly(): String {
+    return dateOnlyFormatter().format(Date())
+}
+
+private fun addDaysToDate(value: String, days: Int): String {
+    val calendar = parseDateValue(value) ?: Calendar.getInstance()
+    calendar.add(Calendar.DAY_OF_YEAR, days)
+    return dateOnlyFormatter().format(calendar.time)
+}
+
+private fun isDateRangeValid(startDate: String, endDate: String): Boolean {
+    val start = parseDateValue(startDate) ?: return false
+    val end = parseDateValue(endDate) ?: return false
+    return !end.before(start)
+}
+
+private fun parseDateValue(value: String): Calendar? {
+    if (value.isBlank()) return null
+
+    return try {
+        val parsedDate = dateOnlyFormatter().parse(value) ?: return null
+        Calendar.getInstance().apply { time = parsedDate }
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private fun formatDateForDisplay(value: String): String {
+    val calendar = parseDateValue(value) ?: return value
+    return SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(calendar.time)
+}
+
+private fun dateOnlyFormatter(): SimpleDateFormat {
+    return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+}
+
+private data class EstimatedScheduleSummary(
+    val startLabel: String,
+    val endLabel: String,
+    val refillLabel: String
+)
+
+private fun defaultTimesFor(frequency: DoseFrequency): List<String> {
+    return when (frequency) {
+        DoseFrequency.ONCE_DAILY -> listOf("09:00 AM")
+        DoseFrequency.TWICE_DAILY -> listOf("09:00 AM", "09:00 PM")
+        DoseFrequency.THREE_TIMES_DAILY -> listOf("09:00 AM", "01:00 PM", "09:00 PM")
+        DoseFrequency.WEEKLY -> listOf("09:00 AM")
+        DoseFrequency.AS_NEEDED -> listOf("09:00 AM")
+    }
+}
+
+private fun applyDefaultTimes(
+    frequency: DoseFrequency,
+    firstReminderTime: String,
+    secondReminderTime: String,
+    thirdReminderTime: String,
+    onFirstTime: (String) -> Unit,
+    onSecondTime: (String) -> Unit,
+    onThirdTime: (String) -> Unit
+) {
+    val defaults = defaultTimesFor(frequency)
+
+    if (firstReminderTime.isBlank()) {
+        onFirstTime(defaults.getOrElse(0) { "" })
+    }
+
+    when (frequency) {
+        DoseFrequency.TWICE_DAILY -> {
+            if (secondReminderTime.isBlank()) {
+                onSecondTime(defaults.getOrElse(1) { "" })
+            }
+            onThirdTime("")
+        }
+        DoseFrequency.THREE_TIMES_DAILY -> {
+            if (secondReminderTime.isBlank()) {
+                onSecondTime(defaults.getOrElse(1) { "" })
+            }
+            if (thirdReminderTime.isBlank()) {
+                onThirdTime(defaults.getOrElse(2) { "" })
+            }
+        }
+        else -> {
+            onSecondTime("")
+            onThirdTime("")
+        }
+    }
+}
+
+private fun buildEstimatedScheduleSummary(
+    medication: Medication?,
+    frequency: DoseFrequency,
+    startDate: String,
+    firstReminderTime: String,
+    secondReminderTime: String,
+    thirdReminderTime: String
+): EstimatedScheduleSummary? {
+    val stockAmount = medication?.currentStockAmount ?: return null
+    val refillAlertAt = medication.refillAlertAt
+    if (stockAmount <= 0.0) return null
+
+    val remindersPerDay = countPlannedRemindersPerDay(
+        frequency = frequency,
+        firstReminderTime = firstReminderTime,
+        secondReminderTime = secondReminderTime,
+        thirdReminderTime = thirdReminderTime
+    )
+    if (remindersPerDay <= 0) return null
+
+    val startCalendar = parseDateValue(startDate) ?: return null
+    val estimatedDaysOfSupply = kotlin.math.ceil(stockAmount / remindersPerDay.toDouble()).toInt()
+    val estimatedEndCalendar = (startCalendar.clone() as Calendar).apply {
+        add(Calendar.DAY_OF_YEAR, estimatedDaysOfSupply - 1)
+    }
+
+    val dosesUntilRefill = (stockAmount - refillAlertAt).coerceAtLeast(0.0)
+    val estimatedRefillDays = kotlin.math.floor(dosesUntilRefill / remindersPerDay.toDouble()).toInt()
+    val refillCalendar = (startCalendar.clone() as Calendar).apply {
+        add(Calendar.DAY_OF_YEAR, estimatedRefillDays)
+    }
+
+    return EstimatedScheduleSummary(
+        startLabel = buildFriendlyStartLabel(startCalendar),
+        endLabel = "Estimated end: ${formatFriendlyDate(estimatedEndCalendar)} (${daysBetweenInclusive(startCalendar, estimatedEndCalendar)} day(s) of supply)",
+        refillLabel = "Estimated refill reminder: ${formatFriendlyDate(refillCalendar)}"
+    )
+}
+
+private fun countPlannedRemindersPerDay(
+    frequency: DoseFrequency,
+    firstReminderTime: String,
+    secondReminderTime: String,
+    thirdReminderTime: String
+): Int {
+    return when (frequency) {
+        DoseFrequency.ONCE_DAILY, DoseFrequency.WEEKLY, DoseFrequency.AS_NEEDED -> if (firstReminderTime.isBlank()) 0 else 1
+        DoseFrequency.TWICE_DAILY -> listOf(firstReminderTime, secondReminderTime).count { it.isNotBlank() }
+        DoseFrequency.THREE_TIMES_DAILY -> listOf(firstReminderTime, secondReminderTime, thirdReminderTime).count { it.isNotBlank() }
+    }
+}
+
+private fun buildFriendlyStartLabel(startCalendar: Calendar): String {
+    val today = Calendar.getInstance()
+    val tomorrow = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }
+    val prefix = when {
+        sameDay(startCalendar, today) -> "Starts today"
+        sameDay(startCalendar, tomorrow) -> "Starts tomorrow"
+        else -> "Starts"
+    }
+    return "$prefix, ${formatFriendlyDate(startCalendar)}"
+}
+
+private fun formatFriendlyDate(calendar: Calendar): String {
+    return SimpleDateFormat("EEEE, dd MMM yyyy", Locale.getDefault()).format(calendar.time)
+}
+
+private fun daysBetweenInclusive(start: Calendar, end: Calendar): Int {
+    val millisecondsPerDay = 24 * 60 * 60 * 1000L
+    val difference = (end.timeInMillis - start.timeInMillis) / millisecondsPerDay
+    return difference.toInt() + 1
+}
+
+private fun buildFrequencyMismatchWarning(
+    dosageText: String,
+    selectedFrequency: DoseFrequency
+): String? {
+    val normalized = dosageText.lowercase()
+    val suggestedFrequency = when {
+        "three times daily" in normalized || "3 times daily" in normalized -> DoseFrequency.THREE_TIMES_DAILY
+        "twice daily" in normalized || "2 times daily" in normalized -> DoseFrequency.TWICE_DAILY
+        "once daily" in normalized || "every morning" in normalized || "daily" in normalized -> DoseFrequency.ONCE_DAILY
+        "weekly" in normalized || "once weekly" in normalized -> DoseFrequency.WEEKLY
+        "as needed" in normalized || "when needed" in normalized -> DoseFrequency.AS_NEEDED
+        else -> null
+    } ?: return null
+
+    return if (suggestedFrequency != selectedFrequency) {
+        "Warning: the medication instructions look like ${suggestedFrequency.name.lowercase().replace('_', ' ')}, but the schedule is set to ${selectedFrequency.name.lowercase().replace('_', ' ')}."
+    } else {
+        null
+    }
+}
+
+private fun sameDay(first: Calendar, second: Calendar): Boolean {
+    return first.get(Calendar.YEAR) == second.get(Calendar.YEAR) &&
+        first.get(Calendar.DAY_OF_YEAR) == second.get(Calendar.DAY_OF_YEAR)
 }
 
 private fun firstTimeLabel(frequency: DoseFrequency): String {

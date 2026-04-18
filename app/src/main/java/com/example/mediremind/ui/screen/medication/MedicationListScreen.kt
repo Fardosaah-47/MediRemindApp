@@ -107,6 +107,20 @@ fun MedicationListScreen(
                                 text = "Refill Alert At: ${medication.refillAlertAt} ${medication.stockUnit}",
                                 style = MaterialTheme.typography.bodyMedium
                             )
+                            if (medication.isQrImported) {
+                                Text(
+                                    text = "Source: Pharmacy QR",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            if (medication.referenceImageUri.isNullOrBlank()) {
+                                Text(
+                                    text = "Reference photo still needed",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -135,7 +149,8 @@ private fun sampleMedications(): List<Medication> {
             dosage = "500 mg twice daily",
             currentStockAmount = 18.0,
             stockUnit = "pills",
-            refillAlertAt = 6.0
+            refillAlertAt = 6.0,
+            isQrImported = true
         ),
         Medication(
             id = 2,

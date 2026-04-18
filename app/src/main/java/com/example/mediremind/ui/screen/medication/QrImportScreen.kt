@@ -41,7 +41,7 @@ fun QrImportScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Use one scan to load medication details and reminder times.",
+            text = "Use one scan to load medication details, set reminder times, and then add the medicine reference photo.",
             style = MaterialTheme.typography.bodyMedium
         )
 
@@ -67,7 +67,7 @@ fun QrImportScreen(
                 Text(text = "1. Medication name")
                 Text(text = "2. Form and dosage")
                 Text(text = "3. Stock amount and refill alert")
-                Text(text = "4. Frequency and reminder times")
+                Text(text = "4. Frequency, reminder times, and treatment period")
             }
         }
 
