@@ -1,6 +1,8 @@
 package com.example.mediremind
 
 import android.os.Bundle
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -25,11 +27,14 @@ import com.example.mediremind.data.model.Medication
 import com.example.mediremind.data.repository.DoseLogRepository
 import com.example.mediremind.data.repository.DoseScheduleRepository
 import com.example.mediremind.data.repository.MedicationRepository
+import com.example.mediremind.data.repository.CaregiverReportQrBuilder
 import com.example.mediremind.data.repository.QrImportParser
+import com.example.mediremind.data.repository.UserProfileRepository
 import com.example.mediremind.ui.screen.home.HomeScreen
 import com.example.mediremind.ui.screen.medication.MedicationFormScreen
 import com.example.mediremind.ui.screen.medication.MedicationListScreen
 import com.example.mediremind.ui.screen.medication.QrImportScreen
+import com.example.mediremind.ui.screen.reminder.CaregiverReportQrScreen
 import com.example.mediremind.ui.screen.reminder.DoseLogDisplayItem
 import com.example.mediremind.ui.screen.reminder.DoseLoggingItem
 import com.example.mediremind.ui.screen.reminder.DoseLoggingScreen
@@ -41,6 +46,8 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.example.mediremind.data.repository.CaregiverReportSummary
+import com.example.mediremind.data.model.UserProfile
 
 private enum class AppScreen {
     HOME,
@@ -49,7 +56,8 @@ private enum class AppScreen {
     SCHEDULE_LIST,
     SCHEDULE_FORM,
     DOSE_LOGGING,
-    QR_IMPORT
+    QR_IMPORT,
+    CAREGIVER_QR
 }
 
 class MainActivity : ComponentActivity() {
@@ -60,15 +68,19 @@ class MainActivity : ComponentActivity() {
             val medicationRepository = remember { MedicationRepository(applicationContext) }
             val doseScheduleRepository = remember { DoseScheduleRepository(applicationContext) }
             val doseLogRepository = remember { DoseLogRepository(applicationContext) }
+            val userProfileRepository = remember { UserProfileRepository(applicationContext) }
             var currentScreen by remember { mutableStateOf(AppScreen.HOME) }
             var medications by remember { mutableStateOf<List<Medication>>(emptyList()) }
             var schedules by remember { mutableStateOf<List<DoseSchedule>>(emptyList()) }
             var doseLogs by remember { mutableStateOf<List<DoseLog>>(emptyList()) }
             var selectedMedication by remember { mutableStateOf<Medication?>(null) }
+            var userProfile by remember { mutableStateOf<UserProfile?>(null) }
             var qrImportMessage by remember {
                 mutableStateOf("Scan a hospital or pharmacy QR code to load medication details.")
             }
             var qrRawPreview by remember { mutableStateOf("No QR scanned yet.") }
+            var caregiverReportSummary by remember { mutableStateOf<CaregiverReportSummary?>(null) }
+            var caregiverReportQr by remember { mutableStateOf<ImageBitmap?>(null) }
             val coroutineScope = rememberCoroutineScope()
 
             LaunchedEffect(currentScreen) {
@@ -78,15 +90,43 @@ class MainActivity : ComponentActivity() {
                 if (
                     currentScreen == AppScreen.SCHEDULE_LIST ||
                     currentScreen == AppScreen.SCHEDULE_FORM ||
-                    currentScreen == AppScreen.DOSE_LOGGING
+                    currentScreen == AppScreen.DOSE_LOGGING ||
+                    currentScreen == AppScreen.CAREGIVER_QR
                 ) {
                     medications = medicationRepository.getAllMedications()
                 }
-                if (currentScreen == AppScreen.SCHEDULE_LIST || currentScreen == AppScreen.DOSE_LOGGING) {
+                if (
+                    currentScreen == AppScreen.SCHEDULE_LIST ||
+                    currentScreen == AppScreen.DOSE_LOGGING ||
+                    currentScreen == AppScreen.CAREGIVER_QR
+                ) {
                     schedules = doseScheduleRepository.getAllDoseSchedules()
                 }
-                if (currentScreen == AppScreen.DOSE_LOGGING) {
+                if (currentScreen == AppScreen.DOSE_LOGGING || currentScreen == AppScreen.CAREGIVER_QR) {
                     doseLogs = doseLogRepository.getAllDoseLogs()
+                }
+                if (currentScreen == AppScreen.CAREGIVER_QR) {
+                    val loadedProfile = userProfileRepository.getFirstUserProfile()
+                    val loadedMedications = medicationRepository.getAllMedications()
+                    val loadedSchedules = doseScheduleRepository.getAllDoseSchedules()
+                    val loadedDoseLogs = doseLogRepository.getAllDoseLogs()
+
+                    userProfile = loadedProfile
+                    medications = loadedMedications
+                    schedules = loadedSchedules
+                    doseLogs = loadedDoseLogs
+
+                    val summary = CaregiverReportQrBuilder.buildSummary(
+                        userProfile = loadedProfile,
+                        medications = loadedMedications,
+                        doseLogs = loadedDoseLogs
+                    )
+                    caregiverReportSummary = summary
+                    caregiverReportQr = if (summary.totalLogged > 0) {
+                        CaregiverReportQrBuilder.generateQrBitmap(summary.qrPayload).asImageBitmap()
+                    } else {
+                        null
+                    }
                 }
             }
 
@@ -112,6 +152,9 @@ class MainActivity : ComponentActivity() {
                         },
                         onStartQrImportFlow = {
                             currentScreen = AppScreen.QR_IMPORT
+                        },
+                        onStartCaregiverQrFlow = {
+                            currentScreen = AppScreen.CAREGIVER_QR
                         },
                         onOpenMedicationForm = {
                             selectedMedication = null
@@ -221,6 +264,11 @@ class MainActivity : ComponentActivity() {
                                     qrImportMessage =
                                         error.message ?: "QR scan failed. Try again."
                                 }
+                        },
+                        caregiverReportSummary = caregiverReportSummary,
+                        caregiverReportQr = caregiverReportQr,
+                        onBackFromCaregiverQr = {
+                            currentScreen = AppScreen.HOME
                         }
                     )
                 }
@@ -241,6 +289,7 @@ private fun AppContent(
     onStartScheduleFlow: () -> Unit,
     onStartDoseLoggingFlow: () -> Unit,
     onStartQrImportFlow: () -> Unit,
+    onStartCaregiverQrFlow: () -> Unit,
     onOpenMedicationForm: () -> Unit,
     onOpenMedicationEditor: (Medication) -> Unit,
     onOpenScheduleForm: () -> Unit,
@@ -254,7 +303,10 @@ private fun AppContent(
     qrImportMessage: String,
     qrRawPreview: String,
     onBackFromQrImport: () -> Unit,
-    onScanMedicationQr: () -> Unit
+    onScanMedicationQr: () -> Unit,
+    caregiverReportSummary: CaregiverReportSummary?,
+    caregiverReportQr: ImageBitmap?,
+    onBackFromCaregiverQr: () -> Unit
 ) {
     when (currentScreen) {
         AppScreen.HOME -> {
@@ -263,7 +315,8 @@ private fun AppContent(
                 onStartMedicationFlow = onStartMedicationFlow,
                 onStartScheduleFlow = onStartScheduleFlow,
                 onStartDoseLoggingFlow = onStartDoseLoggingFlow,
-                onStartQrImportFlow = onStartQrImportFlow
+                onStartQrImportFlow = onStartQrImportFlow,
+                onStartCaregiverQrFlow = onStartCaregiverQrFlow
             )
         }
 
@@ -347,11 +400,32 @@ private fun AppContent(
                 onBackClick = onBackFromQrImport
             )
         }
+
+        AppScreen.CAREGIVER_QR -> {
+            CaregiverReportQrScreen(
+                modifier = modifier,
+                patientName = caregiverReportSummary?.patientName ?: "Patient Not Set",
+                caregiverName = caregiverReportSummary?.caregiverName,
+                reportDate = caregiverReportSummary?.reportDate ?: currentDateOnly(),
+                adherenceRate = caregiverReportSummary?.adherenceRate ?: 0,
+                totalTaken = caregiverReportSummary?.totalTaken ?: 0,
+                totalSkipped = caregiverReportSummary?.totalSkipped ?: 0,
+                totalSnoozed = caregiverReportSummary?.totalSnoozed ?: 0,
+                totalLogged = caregiverReportSummary?.totalLogged ?: 0,
+                qrBitmap = caregiverReportQr,
+                qrPayloadPreview = caregiverReportSummary?.qrPayload.orEmpty(),
+                onBackClick = onBackFromCaregiverQr
+            )
+        }
     }
 }
 
 private fun currentTimestamp(): String {
     return SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault()).format(Date())
+}
+
+private fun currentDateOnly(): String {
+    return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 }
 
 private suspend fun importQrPayload(

@@ -11,6 +11,7 @@ composeBom = "2024.04.01"
 room = "2.6.1"
 ksp = "2.0.0-1.0.24"
 googleCodeScanner = "16.1.0"
+zxing = "3.5.4"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -31,6 +32,7 @@ androidx-room-runtime = { group = "androidx.room", name = "room-runtime", versio
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 google-play-services-code-scanner = { group = "com.google.android.gms", name = "play-services-code-scanner", version.ref = "googleCodeScanner" }
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
