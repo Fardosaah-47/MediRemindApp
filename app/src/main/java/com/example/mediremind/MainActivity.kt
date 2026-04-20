@@ -41,11 +41,12 @@ import com.example.mediremind.ui.screen.home.HomeScreen
 import com.example.mediremind.ui.screen.medication.MedicationFormScreen
 import com.example.mediremind.ui.screen.medication.MedicationListScreen
 import com.example.mediremind.ui.screen.medication.QrImportScreen
-import com.example.mediremind.ui.screen.reminder.CaregiverReportQrScreen
+import com.example.mediremind.ui.screen.reminder.CaregiverScanScreen
 import com.example.mediremind.ui.screen.reminder.DoseLogDisplayItem
 import com.example.mediremind.ui.screen.reminder.DoseLoggingItem
 import com.example.mediremind.ui.screen.reminder.DoseLoggingScreen
 import com.example.mediremind.ui.screen.reminder.PendingDoseVerificationDisplay
+import com.example.mediremind.ui.screen.reminder.PatientReportScreen
 import com.example.mediremind.ui.screen.reminder.TodayDoseSummaryDisplay
 import com.example.mediremind.ui.screen.schedule.DoseScheduleFormScreen
 import com.example.mediremind.ui.screen.schedule.ScheduleDisplayGroup
@@ -71,7 +72,8 @@ private enum class AppScreen {
     SCHEDULE_FORM,
     DOSE_LOGGING,
     QR_IMPORT,
-    CAREGIVER_QR
+    PATIENT_REPORT,
+    CAREGIVER_SCAN
 }
 
 private data class PendingDoseVerification(
@@ -118,6 +120,10 @@ class MainActivity : ComponentActivity() {
             var qrRawPreview by remember { mutableStateOf("No QR scanned yet.") }
             var caregiverReportSummary by remember { mutableStateOf<CaregiverReportSummary?>(null) }
             var caregiverReportQr by remember { mutableStateOf<ImageBitmap?>(null) }
+            var scannedCaregiverReportSummary by remember { mutableStateOf<CaregiverReportSummary?>(null) }
+            var scannedCaregiverReportMessage by remember {
+                mutableStateOf("Scan a MediRemind caregiver QR to view a readable report here.")
+            }
             var doseLoggingMessage by remember {
                 mutableStateOf("")
             }
@@ -204,21 +210,24 @@ class MainActivity : ComponentActivity() {
                     currentScreen == AppScreen.SCHEDULE_LIST ||
                     currentScreen == AppScreen.SCHEDULE_FORM ||
                     currentScreen == AppScreen.DOSE_LOGGING ||
-                    currentScreen == AppScreen.CAREGIVER_QR
+                    currentScreen == AppScreen.PATIENT_REPORT
                 ) {
                     medications = medicationRepository.getAllMedications()
                 }
                 if (
                     currentScreen == AppScreen.SCHEDULE_LIST ||
                     currentScreen == AppScreen.DOSE_LOGGING ||
-                    currentScreen == AppScreen.CAREGIVER_QR
+                    currentScreen == AppScreen.PATIENT_REPORT
                 ) {
                     schedules = doseScheduleRepository.getAllDoseSchedules()
                 }
-                if (currentScreen == AppScreen.DOSE_LOGGING || currentScreen == AppScreen.CAREGIVER_QR) {
+                if (currentScreen == AppScreen.DOSE_LOGGING || currentScreen == AppScreen.PATIENT_REPORT) {
                     doseLogs = doseLogRepository.getAllDoseLogs()
                 }
-                if (currentScreen == AppScreen.DOSE_LOGGING) {
+                if (
+                    currentScreen == AppScreen.DOSE_LOGGING ||
+                    currentScreen == AppScreen.PATIENT_REPORT
+                ) {
                     val loadedSchedules = doseScheduleRepository.getAllDoseSchedules()
                     val loadedDoseLogs = doseLogRepository.getAllDoseLogs()
                     val autoMissedLogs = buildAutoMissedDoseLogs(
@@ -231,7 +240,7 @@ class MainActivity : ComponentActivity() {
                         doseLogs = doseLogRepository.getAllDoseLogs()
                     }
                 }
-                if (currentScreen == AppScreen.CAREGIVER_QR) {
+                if (currentScreen == AppScreen.PATIENT_REPORT) {
                     val loadedProfile = userProfileRepository.getFirstUserProfile()
                     val loadedMedications = medicationRepository.getAllMedications()
                     val loadedSchedules = doseScheduleRepository.getAllDoseSchedules()
@@ -283,8 +292,14 @@ class MainActivity : ComponentActivity() {
                         onStartQrImportFlow = {
                             currentScreen = AppScreen.QR_IMPORT
                         },
-                        onStartCaregiverQrFlow = {
-                            currentScreen = AppScreen.CAREGIVER_QR
+                        onStartPatientReportFlow = {
+                            currentScreen = AppScreen.PATIENT_REPORT
+                        },
+                        onStartCaregiverScanFlow = {
+                            scannedCaregiverReportSummary = null
+                            scannedCaregiverReportMessage =
+                                "Scan a MediRemind caregiver QR to view a readable report here."
+                            currentScreen = AppScreen.CAREGIVER_SCAN
                         },
                         onOpenMedicationForm = {
                             selectedMedication = null
@@ -323,12 +338,21 @@ class MainActivity : ComponentActivity() {
                         },
                         onSaveMedication = { medication ->
                             coroutineScope.launch {
-                                if (medication.id == 0L) {
+                                val savedMedicationId = if (medication.id == 0L) {
                                     medicationRepository.insertMedication(medication)
                                 } else {
                                     medicationRepository.updateMedication(medication)
+                                    medication.id
+                                }
+
+                                if (savedMedicationId != 0L) {
+                                    syncMedicationSchedulesFromMedicationDetails(
+                                        medication = medication.copy(id = savedMedicationId),
+                                        doseScheduleRepository = doseScheduleRepository
+                                    )
                                 }
                                 medications = medicationRepository.getAllMedications()
+                                schedules = doseScheduleRepository.getAllDoseSchedules()
                                 selectedMedication = null
                                 medicationReferenceImageUri = null
                                 currentScreen = AppScreen.MEDICATION_LIST
@@ -541,6 +565,44 @@ class MainActivity : ComponentActivity() {
                         },
                         caregiverReportSummary = caregiverReportSummary,
                         caregiverReportQr = caregiverReportQr,
+                        scannedCaregiverReportSummary = scannedCaregiverReportSummary,
+                        scannedCaregiverReportMessage = scannedCaregiverReportMessage,
+                        onScanCaregiverReportQr = {
+                            val options = GmsBarcodeScannerOptions.Builder()
+                                .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+                                .build()
+                            val scanner = GmsBarcodeScanning.getClient(this@MainActivity, options)
+
+                            scanner.startScan()
+                                .addOnSuccessListener { barcode ->
+                                    val rawValue = barcode.rawValue
+                                    if (rawValue.isNullOrBlank()) {
+                                        scannedCaregiverReportSummary = null
+                                        scannedCaregiverReportMessage =
+                                            "The caregiver QR had no readable content."
+                                        return@addOnSuccessListener
+                                    }
+
+                                    runCatching {
+                                        CaregiverReportQrBuilder.parseQrPayload(rawValue)
+                                    }.onSuccess { importedSummary ->
+                                        scannedCaregiverReportSummary = importedSummary
+                                        scannedCaregiverReportMessage = ""
+                                    }.onFailure { error ->
+                                        scannedCaregiverReportSummary = null
+                                        scannedCaregiverReportMessage =
+                                            error.message ?: "This QR is not a readable MediRemind caregiver report."
+                                    }
+                                }
+                                .addOnCanceledListener {
+                                    scannedCaregiverReportMessage = "Caregiver QR scan was canceled."
+                                }
+                                .addOnFailureListener { error ->
+                                    scannedCaregiverReportSummary = null
+                                    scannedCaregiverReportMessage =
+                                        error.message ?: "Caregiver QR scan failed. Try again."
+                                }
+                        },
                         onBackFromCaregiverQr = {
                             currentScreen = AppScreen.HOME
                         }
@@ -566,7 +628,8 @@ private fun AppContent(
     onStartScheduleFlow: () -> Unit,
     onStartDoseLoggingFlow: () -> Unit,
     onStartQrImportFlow: () -> Unit,
-    onStartCaregiverQrFlow: () -> Unit,
+    onStartPatientReportFlow: () -> Unit,
+    onStartCaregiverScanFlow: () -> Unit,
     onOpenMedicationForm: () -> Unit,
     onOpenMedicationEditor: (Medication) -> Unit,
     onOpenScheduleForm: () -> Unit,
@@ -600,7 +663,8 @@ private fun AppContent(
                 onStartScheduleFlow = onStartScheduleFlow,
                 onStartDoseLoggingFlow = onStartDoseLoggingFlow,
                 onStartQrImportFlow = onStartQrImportFlow,
-                onStartCaregiverQrFlow = onStartCaregiverQrFlow
+                onStartPatientReportFlow = onStartPatientReportFlow,
+                onStartCaregiverScanFlow = onStartCaregiverScanFlow
             )
         }
 
@@ -762,8 +826,8 @@ private fun AppContent(
             )
         }
 
-        AppScreen.CAREGIVER_QR -> {
-            CaregiverReportQrScreen(
+        AppScreen.PATIENT_REPORT -> {
+            PatientReportScreen(
                 modifier = modifier,
                 patientName = caregiverReportSummary?.patientName ?: "Patient Not Set",
                 caregiverName = caregiverReportSummary?.caregiverName,
@@ -772,9 +836,20 @@ private fun AppContent(
                 totalTaken = caregiverReportSummary?.totalTaken ?: 0,
                 totalSkipped = caregiverReportSummary?.totalSkipped ?: 0,
                 totalSnoozed = caregiverReportSummary?.totalSnoozed ?: 0,
+                totalMissed = caregiverReportSummary?.totalMissed ?: 0,
                 totalLogged = caregiverReportSummary?.totalLogged ?: 0,
+                medicationSummaries = caregiverReportSummary?.medicationSummaries ?: emptyList(),
                 qrBitmap = caregiverReportQr,
-                qrPayloadPreview = caregiverReportSummary?.qrPayload.orEmpty(),
+                onBackClick = onBackFromCaregiverQr
+            )
+        }
+
+        AppScreen.CAREGIVER_SCAN -> {
+            CaregiverScanScreen(
+                modifier = modifier,
+                scannedReportSummary = scannedCaregiverReportSummary,
+                scannedReportMessage = scannedCaregiverReportMessage,
+                onScanReportQrClick = onScanCaregiverReportQr,
                 onBackClick = onBackFromCaregiverQr
             )
         }
@@ -890,6 +965,8 @@ private fun buildTodayDoseSummary(
     val summaryMessage = if (visibleRemainingSchedules.isEmpty()) {
         if (schedules.isEmpty()) {
             "No schedules saved for today yet."
+        } else if (missedCount > 0) {
+            "Today's dose window is closed. Review the missed doses below."
         } else {
             "All today's doses are done."
         }
@@ -916,43 +993,80 @@ private fun buildAutoMissedDoseLogs(
     existingLogs: List<DoseLog>,
     todayDate: String
 ): List<DoseLog> {
-    val latestTodayLogBySchedule = existingLogs
-        .filter { it.logDate == todayDate }
-        .groupBy { it.doseScheduleId }
+    val latestLogByScheduleAndDate = existingLogs
+        .groupBy { "${it.doseScheduleId}|${it.logDate}" }
         .mapValues { (_, logs) -> logs.maxByOrNull { it.id } }
+    val currentMinutes = currentMinutesOfDay()
 
     return schedules
-        .filter { schedule ->
-            isScheduleActiveOnDate(
+        .flatMap { schedule ->
+            buildRelevantScheduleDates(
                 schedule = schedule,
-                dateValue = todayDate
-            )
+                todayDate = todayDate
+            ).mapNotNull { targetDate ->
+                val latestLog = latestLogByScheduleAndDate["${schedule.id}|$targetDate"]
+                val shouldAutoMiss = shouldAutoMarkMissed(
+                    schedule = schedule,
+                    latestLog = latestLog,
+                    targetDate = targetDate,
+                    todayDate = todayDate,
+                    currentMinutes = currentMinutes
+                )
+                if (!shouldAutoMiss) {
+                    null
+                } else {
+                    DoseLog(
+                        doseScheduleId = schedule.id,
+                        medicationId = schedule.medicationId,
+                        scheduledTime = schedule.time,
+                        logDate = targetDate,
+                        status = DoseStatus.MISSED,
+                        takenAt = null,
+                        imageUri = null
+                    )
+                }
+            }
         }
-        .mapNotNull { schedule ->
-        val latestLog = latestTodayLogBySchedule[schedule.id]
-        val shouldAutoMiss = shouldAutoMarkMissed(
-            schedule = schedule,
-            latestLog = latestLog
-        )
-        if (!shouldAutoMiss) {
-            null
-        } else {
-            DoseLog(
-                doseScheduleId = schedule.id,
-                medicationId = schedule.medicationId,
-                scheduledTime = schedule.time,
-                logDate = todayDate,
-                status = DoseStatus.MISSED,
-                takenAt = null,
-                imageUri = null
-            )
-        }
+}
+
+private fun buildRelevantScheduleDates(
+    schedule: DoseSchedule,
+    todayDate: String
+): List<String> {
+    if (schedule.frequency == com.example.mediremind.data.model.DoseFrequency.AS_NEEDED) {
+        return emptyList()
     }
+
+    val todayCalendar = parseDateOnly(todayDate) ?: return emptyList()
+    val startCalendar = parseDateOnly(schedule.startDate) ?: todayCalendar
+    val endCalendar = parseDateOnly(schedule.endDate)?.let { end ->
+        if (end.after(todayCalendar)) todayCalendar else end
+    } ?: todayCalendar
+
+    if (startCalendar.after(endCalendar)) {
+        return emptyList()
+    }
+
+    val dates = mutableListOf<String>()
+    val cursor = startCalendar.clone() as Calendar
+
+    while (!cursor.after(endCalendar) && dates.size < 366) {
+        val dateValue = formatDateOnly(cursor)
+        if (isScheduleActiveOnDate(schedule, dateValue)) {
+            dates.add(dateValue)
+        }
+        cursor.add(Calendar.DAY_OF_YEAR, 1)
+    }
+
+    return dates
 }
 
 private fun shouldAutoMarkMissed(
     schedule: DoseSchedule,
-    latestLog: DoseLog?
+    latestLog: DoseLog?,
+    targetDate: String,
+    todayDate: String,
+    currentMinutes: Int
 ): Boolean {
     if (schedule.frequency == com.example.mediremind.data.model.DoseFrequency.AS_NEEDED) {
         return false

@@ -20,21 +20,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.mediremind.data.repository.CaregiverMedicationSummary
 import com.example.mediremind.ui.theme.MediRemindTheme
 
 @Composable
-fun CaregiverReportQrScreen(
+fun PatientReportScreen(
     modifier: Modifier = Modifier,
     patientName: String = "Patient Not Set",
     caregiverName: String? = null,
-    reportDate: String = "2026-04-18",
+    reportDate: String = "2026-04-19",
     adherenceRate: Int = 0,
     totalTaken: Int = 0,
     totalSkipped: Int = 0,
     totalSnoozed: Int = 0,
+    totalMissed: Int = 0,
     totalLogged: Int = 0,
+    medicationSummaries: List<CaregiverMedicationSummary> = emptyList(),
     qrBitmap: ImageBitmap? = null,
-    qrPayloadPreview: String = "",
     onBackClick: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
@@ -47,7 +49,7 @@ fun CaregiverReportQrScreen(
         verticalArrangement = Arrangement.Top
     ) {
         Text(
-            text = "Caregiver Report QR",
+            text = "Patient Report",
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.primary
         )
@@ -55,7 +57,7 @@ fun CaregiverReportQrScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Generate one QR so a caregiver can scan and view a compact medication-adherence summary.",
+            text = "This screen prepares a caregiver-ready report from the patient's medication activity.",
             style = MaterialTheme.typography.bodyMedium
         )
 
@@ -96,7 +98,45 @@ fun CaregiverReportQrScreen(
                 Text(text = "Taken: $totalTaken")
                 Text(text = "Skipped: $totalSkipped")
                 Text(text = "Snoozed: $totalSnoozed")
+                if (totalMissed > 0) {
+                    Text(text = "Missed: $totalMissed")
+                }
                 Text(text = "Total Logged: $totalLogged")
+            }
+        }
+
+        if (medicationSummaries.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "Medication Breakdown",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    medicationSummaries.forEach { medication ->
+                        Text(
+                            text = medication.name,
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Text(
+                            text = "Taken ${medication.taken} - Skipped ${medication.skipped} - Snoozed ${medication.snoozed} - Missed ${medication.missed}",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
             }
         }
 
@@ -117,6 +157,13 @@ fun CaregiverReportQrScreen(
                     color = MaterialTheme.colorScheme.primary
                 )
 
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "A caregiver can scan this QR in MediRemind to open a readable summary.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+
                 Spacer(modifier = Modifier.height(12.dp))
 
                 if (qrBitmap != null) {
@@ -127,35 +174,10 @@ fun CaregiverReportQrScreen(
                     )
                 } else {
                     Text(
-                        text = "No report QR available yet. Log at least one dose first.",
+                        text = "No caregiver QR is ready yet. Log at least one dose first.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
-                Text(
-                    text = "QR Payload Preview",
-                    style = MaterialTheme.typography.titleMedium
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = qrPayloadPreview.ifBlank { "No QR payload generated yet." },
-                    style = MaterialTheme.typography.bodySmall
-                )
             }
         }
     }
@@ -163,18 +185,28 @@ fun CaregiverReportQrScreen(
 
 @Preview(showBackground = true)
 @Composable
-private fun CaregiverReportQrScreenPreview() {
+private fun PatientReportScreenPreview() {
     MediRemindTheme {
-        CaregiverReportQrScreen(
+        PatientReportScreen(
             patientName = "Mary Achieng",
             caregiverName = "Jane Achieng",
-            reportDate = "2026-04-18",
+            reportDate = "2026-04-19",
             adherenceRate = 83,
             totalTaken = 5,
             totalSkipped = 1,
             totalSnoozed = 0,
+            totalMissed = 0,
             totalLogged = 6,
-            qrPayloadPreview = """{"type":"mediremind_report_v1"}"""
+            medicationSummaries = listOf(
+                CaregiverMedicationSummary(
+                    name = "Paracetamol",
+                    taken = 4,
+                    skipped = 1,
+                    snoozed = 0,
+                    missed = 0,
+                    totalLogged = 5
+                )
+            )
         )
     }
 }

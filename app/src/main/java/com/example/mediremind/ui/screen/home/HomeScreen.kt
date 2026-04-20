@@ -28,7 +28,8 @@ fun HomeScreen(
     onStartScheduleFlow: () -> Unit = {},
     onStartDoseLoggingFlow: () -> Unit = {},
     onStartQrImportFlow: () -> Unit = {},
-    onStartCaregiverQrFlow: () -> Unit = {}
+    onStartPatientReportFlow: () -> Unit = {},
+    onStartCaregiverScanFlow: () -> Unit = {}
 ) {
     Column(
         modifier = modifier
@@ -113,8 +114,14 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        Button(onClick = onStartCaregiverQrFlow) {
-            Text(text = "Generate Caregiver QR")
+        Button(onClick = onStartPatientReportFlow) {
+            Text(text = "Open Patient Report")
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(onClick = onStartCaregiverScanFlow) {
+            Text(text = "Open Caregiver Scan")
         }
     }
 }
