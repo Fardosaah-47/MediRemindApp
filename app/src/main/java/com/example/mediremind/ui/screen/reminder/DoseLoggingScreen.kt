@@ -108,7 +108,7 @@ fun DoseLoggingScreen(
         buildStatusSections(todayLoggedDoses)
     }
     val historyDateSections = remember(filteredRecentLogs) {
-        buildDateSections(filteredRecentLogs)
+        buildGroupedDateSections(filteredRecentLogs)
     }
 
     Column(
@@ -228,6 +228,13 @@ fun DoseLoggingScreen(
                     Text(
                         text = "Compare the saved medicine photo with the live photo you just captured, then confirm.",
                         style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Use the real bottle, blister pack, or pill in the live camera photo. Gallery photos are not used here.",
+                        style = MaterialTheme.typography.bodySmall
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -480,8 +487,8 @@ fun DoseLoggingScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                section.logs.forEach { log ->
-                    DoseLogCard(log = log)
+                buildGroupedDoseLogItems(section.logs).forEach { item ->
+                    GroupedDoseLogCard(item = item)
                 }
             }
         }
@@ -536,8 +543,8 @@ fun DoseLoggingScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                section.logs.forEach { log ->
-                    DoseLogCard(log = log)
+                section.items.forEach { item ->
+                    GroupedDoseLogCard(item = item)
                 }
             }
         }
@@ -658,6 +665,65 @@ private fun DoseLogCard(
 }
 
 @Composable
+private fun GroupedDoseLogCard(
+    item: GroupedDoseLogItem
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = item.medicationName,
+                style = MaterialTheme.typography.titleSmall
+            )
+            Text(
+                text = "Times: ${item.scheduledTimes.joinToString(", ")}",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                text = "Date: ${formatHistoryDate(item.logDate)}",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                text = item.statusSummary,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+            item.takenAtEntries.forEach { entry ->
+                Text(
+                    text = "Recorded: $entry",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            if (item.hasVerificationPhoto) {
+                Text(
+                    text = "Verification photo saved",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                if (!item.imageUri.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    VerificationImagePreview(
+                        imageUri = item.imageUri,
+                        size = 72.dp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun VerificationImagePreview(
     imageUri: String,
     modifier: Modifier = Modifier,
@@ -697,6 +763,21 @@ private enum class LogHistoryRange(val label: String) {
 private data class DoseLogSection(
     val title: String,
     val logs: List<DoseLogDisplayItem>
+)
+
+private data class GroupedDoseLogItem(
+    val medicationName: String,
+    val logDate: String,
+    val scheduledTimes: List<String>,
+    val statusSummary: String,
+    val takenAtEntries: List<String>,
+    val imageUri: String? = null,
+    val hasVerificationPhoto: Boolean = false
+)
+
+private data class GroupedDoseLogSection(
+    val title: String,
+    val items: List<GroupedDoseLogItem>
 )
 
 private fun filterDoseLogsForRange(
@@ -757,6 +838,74 @@ private fun buildDateSections(
         }
 }
 
+private fun buildGroupedDateSections(
+    logs: List<DoseLogDisplayItem>
+): List<GroupedDoseLogSection> {
+    return logs
+        .groupBy { it.logDate }
+        .toList()
+        .sortedByDescending { (date, _) ->
+            parseLogDate(date)?.timeInMillis ?: Long.MIN_VALUE
+        }
+        .map { (date, dateLogs) ->
+            GroupedDoseLogSection(
+                title = formatFullDateHeader(date),
+                items = buildGroupedDoseLogItems(dateLogs)
+            )
+        }
+}
+
+private fun buildGroupedDoseLogItems(
+    logs: List<DoseLogDisplayItem>
+): List<GroupedDoseLogItem> {
+    return logs
+        .groupBy { it.medicationName.trim().lowercase() }
+        .values
+        .map { medicationLogs ->
+            val sortedLogs = medicationLogs.sortedWith(
+                compareBy<DoseLogDisplayItem> { parseTimeToMinutesForLogs(it.scheduledTime) ?: Int.MAX_VALUE }
+                    .thenBy { statusSortOrder(it.status) }
+            )
+            val latestPhotoLog = sortedLogs.lastOrNull { !it.imageUri.isNullOrBlank() }
+            GroupedDoseLogItem(
+                medicationName = sortedLogs.first().medicationName,
+                logDate = sortedLogs.first().logDate,
+                scheduledTimes = sortedLogs.map { it.scheduledTime },
+                statusSummary = buildStatusSummary(sortedLogs),
+                takenAtEntries = sortedLogs.mapNotNull { log ->
+                    log.takenAt?.let { "${log.scheduledTime}: $it" }
+                },
+                imageUri = latestPhotoLog?.imageUri,
+                hasVerificationPhoto = sortedLogs.any { it.hasVerificationPhoto }
+            )
+        }
+        .sortedWith(
+            compareBy<GroupedDoseLogItem>(
+                { firstTimeMinutes(it.scheduledTimes) ?: Int.MAX_VALUE },
+                { it.medicationName.lowercase() }
+            )
+        )
+}
+
+private fun buildStatusSummary(
+    logs: List<DoseLogDisplayItem>
+): String {
+    val counts = linkedMapOf(
+        DoseStatus.TAKEN to logs.count { it.status == DoseStatus.TAKEN },
+        DoseStatus.MISSED to logs.count { it.status == DoseStatus.MISSED },
+        DoseStatus.SKIPPED to logs.count { it.status == DoseStatus.SKIPPED },
+        DoseStatus.SNOOZED to logs.count { it.status == DoseStatus.SNOOZED }
+    )
+
+    return counts.mapNotNull { (status, count) ->
+        if (count == 0) null else "${statusSectionTitle(status)} $count"
+    }.joinToString(" • ")
+}
+
+private fun firstTimeMinutes(times: List<String>): Int? {
+    return times.firstOrNull()?.let { parseTimeToMinutesForLogs(it) }
+}
+
 private fun doseLogDisplayComparator(): Comparator<DoseLogDisplayItem> {
     return compareBy<DoseLogDisplayItem>(
         { statusSortOrder(it.status) },
@@ -799,13 +948,13 @@ private fun sameDay(first: Calendar, second: Calendar): Boolean {
 }
 
 private fun sameWeek(first: Calendar, second: Calendar): Boolean {
-    return first.get(Calendar.YEAR) == second.get(Calendar.YEAR) &&
-        first.get(Calendar.WEEK_OF_YEAR) == second.get(Calendar.WEEK_OF_YEAR)
+    val differenceInDays = ((second.timeInMillis - first.timeInMillis) / (24 * 60 * 60 * 1000L)).toInt()
+    return differenceInDays in 0..6
 }
 
 private fun sameMonth(first: Calendar, second: Calendar): Boolean {
-    return first.get(Calendar.YEAR) == second.get(Calendar.YEAR) &&
-        first.get(Calendar.MONTH) == second.get(Calendar.MONTH)
+    val differenceInDays = ((second.timeInMillis - first.timeInMillis) / (24 * 60 * 60 * 1000L)).toInt()
+    return differenceInDays in 0..29
 }
 
 private fun formatHistoryDate(logDate: String): String {
