@@ -653,6 +653,9 @@ private fun AppContent(
     onScanMedicationQr: () -> Unit,
     caregiverReportSummary: CaregiverReportSummary?,
     caregiverReportQr: ImageBitmap?,
+    scannedCaregiverReportSummary: CaregiverReportSummary?,
+    scannedCaregiverReportMessage: String,
+    onScanCaregiverReportQr: () -> Unit,
     onBackFromCaregiverQr: () -> Unit
 ) {
     when (currentScreen) {
@@ -1075,13 +1078,94 @@ private fun shouldAutoMarkMissed(
         return false
     }
 
-    val scheduleMinutes = parseTimeToMinutes(schedule.time) ?: return false
-    val currentMinutes = Calendar.getInstance().let {
-        it.get(Calendar.HOUR_OF_DAY) * 60 + it.get(Calendar.MINUTE)
+    if (targetDate != todayDate) {
+        return true
     }
+
+    val scheduleMinutes = parseTimeToMinutes(schedule.time) ?: return false
     val graceWindowMinutes = 60
 
     return currentMinutes > scheduleMinutes + graceWindowMinutes
+}
+
+private fun currentMinutesOfDay(): Int {
+    return Calendar.getInstance().let {
+        it.get(Calendar.HOUR_OF_DAY) * 60 + it.get(Calendar.MINUTE)
+    }
+}
+
+private fun formatDateOnly(calendar: Calendar): String {
+    return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(calendar.time)
+}
+
+private fun formatSchedulePeriod(
+    startDate: String,
+    endDate: String
+): String {
+    val formattedStartDate = formatDateShort(startDate)
+    val formattedEndDate = formatDateShort(endDate)
+
+    return when {
+        formattedStartDate == null && formattedEndDate == null -> "Always active"
+        formattedStartDate != null && formattedEndDate != null -> "$formattedStartDate - $formattedEndDate"
+        formattedStartDate != null -> "From $formattedStartDate"
+        else -> "Until $formattedEndDate"
+    }
+}
+
+private fun buildScheduleDisplayGroups(
+    schedules: List<DoseSchedule>,
+    medications: List<Medication>
+): List<ScheduleDisplayGroup> {
+    val todayDate = currentDateOnly()
+
+    return schedules
+        .filter { schedule ->
+            schedule.endDate.isBlank() || isScheduleActiveOnOrAfterToday(
+                schedule = schedule,
+                todayDate = todayDate
+            )
+        }
+        .groupBy { schedule ->
+            Triple(
+                schedule.medicationId,
+                schedule.frequency,
+                "${schedule.startDate}|${schedule.endDate}"
+            )
+        }
+        .map { (_, groupedSchedules) ->
+            val firstSchedule = groupedSchedules.first()
+            ScheduleDisplayGroup(
+                medicationName = medications.firstOrNull { it.id == firstSchedule.medicationId }?.name
+                    ?: "Unknown Medication",
+                frequency = firstSchedule.frequency,
+                periodLabel = formatSchedulePeriod(
+                    startDate = firstSchedule.startDate,
+                    endDate = firstSchedule.endDate
+                ),
+                timeEntries = groupedSchedules
+                    .sortedBy { parseTimeToMinutes(it.time) ?: Int.MAX_VALUE }
+                    .map { schedule ->
+                        ScheduleTimeDisplayItem(
+                            schedule = schedule,
+                            reminderTime = schedule.time
+                        )
+                    }
+            )
+        }
+        .sortedWith(
+            compareBy<ScheduleDisplayGroup> { it.medicationName }
+                .thenBy { parseTimeToMinutes(it.timeEntries.firstOrNull()?.reminderTime.orEmpty()) ?: Int.MAX_VALUE }
+        )
+}
+
+private fun isScheduleActiveOnOrAfterToday(
+    schedule: DoseSchedule,
+    todayDate: String
+): Boolean {
+    val todayCalendar = parseDateOnly(todayDate) ?: return true
+    val endCalendar = parseDateOnly(schedule.endDate) ?: return true
+    return !endCalendar.before(todayCalendar)
 }
 
 private fun formatTodaySummaryDate(value: String): String {
@@ -1139,62 +1223,143 @@ private fun parseDateOnly(value: String): Calendar? {
     }
 }
 
-private fun formatSchedulePeriod(
-    startDate: String,
-    endDate: String
-): String {
-    val formattedStartDate = formatDateShort(startDate)
-    val formattedEndDate = formatDateShort(endDate)
-
-    return when {
-        formattedStartDate == null && formattedEndDate == null -> "Always active"
-        formattedStartDate != null && formattedEndDate != null -> "$formattedStartDate - $formattedEndDate"
-        formattedStartDate != null -> "From $formattedStartDate"
-        else -> "Until $formattedEndDate"
-    }
-}
-
-private fun buildScheduleDisplayGroups(
-    schedules: List<DoseSchedule>,
-    medications: List<Medication>
-): List<ScheduleDisplayGroup> {
-    return schedules
-        .groupBy { schedule ->
-            Triple(
-                schedule.medicationId,
-                schedule.frequency,
-                "${schedule.startDate}|${schedule.endDate}"
-            )
-        }
-        .map { (_, groupedSchedules) ->
-            val firstSchedule = groupedSchedules.first()
-            ScheduleDisplayGroup(
-                medicationName = medications.firstOrNull { it.id == firstSchedule.medicationId }?.name
-                    ?: "Unknown Medication",
-                frequency = firstSchedule.frequency,
-                periodLabel = formatSchedulePeriod(
-                    startDate = firstSchedule.startDate,
-                    endDate = firstSchedule.endDate
-                ),
-                timeEntries = groupedSchedules
-                    .sortedBy { parseTimeToMinutes(it.time) ?: Int.MAX_VALUE }
-                    .map { schedule ->
-                        ScheduleTimeDisplayItem(
-                            schedule = schedule,
-                            reminderTime = schedule.time
-                        )
-                    }
-            )
-        }
-        .sortedWith(
-            compareBy<ScheduleDisplayGroup> { it.medicationName }
-                .thenBy { parseTimeToMinutes(it.timeEntries.firstOrNull()?.reminderTime.orEmpty()) ?: Int.MAX_VALUE }
-        )
-}
-
 private fun formatDateShort(value: String): String? {
     val calendar = parseDateOnly(value) ?: return null
     return SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(calendar.time)
+}
+
+private suspend fun syncMedicationSchedulesFromMedicationDetails(
+    medication: Medication,
+    doseScheduleRepository: DoseScheduleRepository
+) {
+    val inferredFrequency = inferDoseFrequencyFromDosageText(medication.dosage) ?: return
+    val existingSchedules = doseScheduleRepository.getSchedulesForMedication(medication.id)
+    if (existingSchedules.isEmpty()) return
+
+    val todayDate = currentDateOnly()
+    val activeSchedules = existingSchedules.filter { schedule ->
+        schedule.endDate.isBlank() || isScheduleActiveOnOrAfterToday(
+            schedule = schedule,
+            todayDate = todayDate
+        )
+    }.sortedBy { parseTimeToMinutes(it.time) ?: Int.MAX_VALUE }
+
+    if (activeSchedules.isEmpty()) return
+
+    val startDate = activeSchedules.minByOrNull { parseDateOnly(it.startDate)?.timeInMillis ?: Long.MAX_VALUE }
+        ?.startDate
+        ?.takeIf { it.isNotBlank() }
+        ?: plusDays(todayDate, 1)
+    val endDate = calculateEndDateFromMedication(
+        medication = medication,
+        frequency = inferredFrequency,
+        startDate = startDate
+    )
+    val reminderTimes = resolveReminderTimesForFrequency(
+        frequency = inferredFrequency,
+        existingSchedules = activeSchedules
+    )
+
+    activeSchedules.take(reminderTimes.size).forEachIndexed { index, schedule ->
+        doseScheduleRepository.updateDoseSchedule(
+            schedule.copy(
+                time = reminderTimes[index],
+                frequency = inferredFrequency,
+                startDate = startDate,
+                endDate = endDate
+            )
+        )
+    }
+
+    if (activeSchedules.size < reminderTimes.size) {
+        val newSchedules = reminderTimes.drop(activeSchedules.size).map { time ->
+            DoseSchedule(
+                medicationId = medication.id,
+                time = time,
+                frequency = inferredFrequency,
+                startDate = startDate,
+                endDate = endDate
+            )
+        }
+        doseScheduleRepository.insertDoseSchedules(newSchedules)
+    }
+
+    val obsoleteSchedules = activeSchedules.drop(reminderTimes.size)
+    if (obsoleteSchedules.isNotEmpty()) {
+        val archivedEndDate = plusDays(todayDate, -1)
+        obsoleteSchedules.forEach { obsoleteSchedule ->
+            doseScheduleRepository.updateDoseSchedule(
+                obsoleteSchedule.copy(endDate = archivedEndDate)
+            )
+        }
+    }
+}
+
+private fun inferDoseFrequencyFromDosageText(
+    dosageText: String
+): com.example.mediremind.data.model.DoseFrequency? {
+    val normalized = dosageText.lowercase()
+    return when {
+        "three times daily" in normalized || "3 times daily" in normalized -> com.example.mediremind.data.model.DoseFrequency.THREE_TIMES_DAILY
+        "twice daily" in normalized || "2 times daily" in normalized -> com.example.mediremind.data.model.DoseFrequency.TWICE_DAILY
+        "once daily" in normalized || "daily" in normalized || "every morning" in normalized -> com.example.mediremind.data.model.DoseFrequency.ONCE_DAILY
+        "weekly" in normalized || "once weekly" in normalized -> com.example.mediremind.data.model.DoseFrequency.WEEKLY
+        "as needed" in normalized || "when needed" in normalized -> com.example.mediremind.data.model.DoseFrequency.AS_NEEDED
+        else -> null
+    }
+}
+
+private fun resolveReminderTimesForFrequency(
+    frequency: com.example.mediremind.data.model.DoseFrequency,
+    existingSchedules: List<DoseSchedule>
+): List<String> {
+    val existingTimes = existingSchedules
+        .sortedBy { parseTimeToMinutes(it.time) ?: Int.MAX_VALUE }
+        .map { it.time }
+    val desiredCount = countReminderSlotsForFrequency(frequency)
+    val fallbackTimes = defaultReminderTimesForFrequency(frequency)
+
+    return buildList {
+        repeat(desiredCount) { index ->
+            add(existingTimes.getOrNull(index) ?: fallbackTimes.getOrElse(index) { fallbackTimes.lastOrNull().orEmpty() })
+        }
+    }
+}
+
+private fun countReminderSlotsForFrequency(
+    frequency: com.example.mediremind.data.model.DoseFrequency
+): Int {
+    return when (frequency) {
+        com.example.mediremind.data.model.DoseFrequency.ONCE_DAILY,
+        com.example.mediremind.data.model.DoseFrequency.WEEKLY,
+        com.example.mediremind.data.model.DoseFrequency.AS_NEEDED -> 1
+        com.example.mediremind.data.model.DoseFrequency.TWICE_DAILY -> 2
+        com.example.mediremind.data.model.DoseFrequency.THREE_TIMES_DAILY -> 3
+    }
+}
+
+private fun defaultReminderTimesForFrequency(
+    frequency: com.example.mediremind.data.model.DoseFrequency
+): List<String> {
+    return when (frequency) {
+        com.example.mediremind.data.model.DoseFrequency.ONCE_DAILY -> listOf("09:00 AM")
+        com.example.mediremind.data.model.DoseFrequency.TWICE_DAILY -> listOf("09:00 AM", "09:00 PM")
+        com.example.mediremind.data.model.DoseFrequency.THREE_TIMES_DAILY -> listOf("09:00 AM", "01:00 PM", "09:00 PM")
+        com.example.mediremind.data.model.DoseFrequency.WEEKLY -> listOf("09:00 AM")
+        com.example.mediremind.data.model.DoseFrequency.AS_NEEDED -> listOf("09:00 AM")
+    }
+}
+
+private fun calculateEndDateFromMedication(
+    medication: Medication,
+    frequency: com.example.mediremind.data.model.DoseFrequency,
+    startDate: String
+): String {
+    val remindersPerDay = countReminderSlotsForFrequency(frequency).coerceAtLeast(1)
+    val estimatedDaysOfSupply = kotlin.math.ceil(
+        medication.currentStockAmount / remindersPerDay.toDouble()
+    ).toInt().coerceAtLeast(1)
+    return plusDays(startDate, estimatedDaysOfSupply - 1)
 }
 
 private fun plusDays(value: String, days: Int): String {
@@ -1315,23 +1480,71 @@ private suspend fun importQrPayload(
     val defaultEndDate = plusDays(startDate, 29)
     val insertedMedicationIds = mutableListOf<Long>()
     var autoScheduledCount = 0
+    val existingMedications = medicationRepository.getAllMedications()
 
     payload.medications.forEach { importedMedication ->
-        val medicationId = medicationRepository.insertMedication(importedMedication.medication)
+        val matchedMedication = existingMedications.firstOrNull { existingMedication ->
+            existingMedication.name.trim().equals(importedMedication.medication.name.trim(), ignoreCase = true) &&
+                existingMedication.form == importedMedication.medication.form
+        }
+
+        val medicationId = if (matchedMedication != null) {
+            medicationRepository.updateMedication(
+                importedMedication.medication.copy(
+                    id = matchedMedication.id,
+                    referenceImageUri = matchedMedication.referenceImageUri
+                        ?: importedMedication.medication.referenceImageUri,
+                    isQrImported = true
+                )
+            )
+            matchedMedication.id
+        } else {
+            medicationRepository.insertMedication(importedMedication.medication)
+        }
         insertedMedicationIds.add(medicationId)
 
-        val schedulesToSave = importedMedication.times.map { time ->
-            DoseSchedule(
-                medicationId = medicationId,
-                time = time,
-                frequency = importedMedication.frequency,
-                startDate = startDate,
-                endDate = defaultEndDate
+        val existingSchedules = doseScheduleRepository.getSchedulesForMedication(medicationId)
+            .filter { schedule ->
+                schedule.endDate.isBlank() || isScheduleActiveOnOrAfterToday(
+                    schedule = schedule,
+                    todayDate = currentDateOnly()
+                )
+            }
+            .sortedBy { parseTimeToMinutes(it.time) ?: Int.MAX_VALUE }
+        val desiredTimes = importedMedication.times
+        val desiredCount = desiredTimes.size
+
+        existingSchedules.take(desiredCount).forEachIndexed { index, schedule ->
+            doseScheduleRepository.updateDoseSchedule(
+                schedule.copy(
+                    time = desiredTimes[index],
+                    frequency = importedMedication.frequency,
+                    startDate = startDate,
+                    endDate = defaultEndDate
+                )
             )
         }
 
-        doseScheduleRepository.insertDoseSchedules(schedulesToSave)
-        autoScheduledCount += schedulesToSave.size
+        if (existingSchedules.size < desiredCount) {
+            val schedulesToSave = desiredTimes.drop(existingSchedules.size).map { time ->
+                DoseSchedule(
+                    medicationId = medicationId,
+                    time = time,
+                    frequency = importedMedication.frequency,
+                    startDate = startDate,
+                    endDate = defaultEndDate
+                )
+            }
+            doseScheduleRepository.insertDoseSchedules(schedulesToSave)
+        }
+
+        existingSchedules.drop(desiredCount).forEach { obsoleteSchedule ->
+            doseScheduleRepository.updateDoseSchedule(
+                obsoleteSchedule.copy(endDate = plusDays(currentDateOnly(), -1))
+            )
+        }
+
+        autoScheduledCount += desiredCount
     }
 
     return QrImportResult(

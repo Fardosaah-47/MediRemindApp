@@ -6,11 +6,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -129,7 +131,7 @@ fun DoseScheduleFormScreen(
 
         Text(
             text = if (isEditing) {
-                "Correct the reminder time or treatment period for this saved schedule."
+                "Adjust the reminder time and treatment dates for this saved schedule."
             } else {
                 "Set when the patient should take each medication."
             },
@@ -194,7 +196,7 @@ fun DoseScheduleFormScreen(
             )
         }
 
-        if (!frequencyMismatchWarning.isNullOrBlank()) {
+        if (!isEditing && !frequencyMismatchWarning.isNullOrBlank()) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = frequencyMismatchWarning,
@@ -212,25 +214,49 @@ fun DoseScheduleFormScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        DoseFrequency.entries.forEach { frequency ->
-            val isSelected = selectedFrequency.value == frequency
-            val label = frequency.name.lowercase().replace('_', ' ')
-            if (isSelected) {
-                Button(
-                    onClick = { selectedFrequency.value = frequency },
-                    modifier = Modifier.fillMaxWidth()
+        if (isEditing) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
                 ) {
-                    Text(text = label)
-                }
-            } else {
-                OutlinedButton(
-                    onClick = { selectedFrequency.value = frequency },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(text = label)
+                    Text(
+                        text = selectedFrequency.value.name.lowercase().replace('_', ' '),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "To change once daily, twice daily, or three times daily, update the medication instructions in Medication Setup. The linked schedule pattern will refresh there automatically.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+        } else {
+            DoseFrequency.entries.forEach { frequency ->
+                val isSelected = selectedFrequency.value == frequency
+                val label = frequency.name.lowercase().replace('_', ' ')
+                if (isSelected) {
+                    Button(
+                        onClick = { selectedFrequency.value = frequency },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(text = label)
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = { selectedFrequency.value = frequency },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(text = label)
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -374,23 +400,25 @@ fun DoseScheduleFormScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    Text(
-                        text = summary.startLabel,
-                        style = MaterialTheme.typography.bodyMedium
+                    EstimatedPlanRow(
+                        label = "Starts",
+                        value = summary.startLabel
                     )
-                    Text(
-                        text = summary.endLabel,
-                        style = MaterialTheme.typography.bodyMedium
+                    Spacer(modifier = Modifier.height(8.dp))
+                    EstimatedPlanRow(
+                        label = "Expected End",
+                        value = summary.endLabel
                     )
-                    Text(
-                        text = summary.refillLabel,
-                        style = MaterialTheme.typography.bodyMedium
+                    Spacer(modifier = Modifier.height(8.dp))
+                    EstimatedPlanRow(
+                        label = "Refill Alert",
+                        value = summary.refillLabel
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "This estimate can change later if real dose logs show missed or skipped doses.",
+                        text = "This timeline may shift later if real dose logs show skipped or missed doses.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -558,6 +586,27 @@ private data class EstimatedScheduleSummary(
     val refillLabel: String
 )
 
+@Composable
+private fun EstimatedPlanRow(
+    label: String,
+    value: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text = "$label:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.width(96.dp)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
 private fun defaultTimesFor(frequency: DoseFrequency): List<String> {
     return when (frequency) {
         DoseFrequency.ONCE_DAILY -> listOf("09:00 AM")
@@ -639,8 +688,8 @@ private fun buildEstimatedScheduleSummary(
 
     return EstimatedScheduleSummary(
         startLabel = buildFriendlyStartLabel(startCalendar),
-        endLabel = "Estimated end: ${formatFriendlyDate(estimatedEndCalendar)} (${daysBetweenInclusive(startCalendar, estimatedEndCalendar)} day(s) of supply)",
-        refillLabel = "Estimated refill reminder: ${formatFriendlyDate(refillCalendar)}"
+        endLabel = "${formatFriendlyDate(estimatedEndCalendar)} (${daysBetweenInclusive(startCalendar, estimatedEndCalendar)} day(s) supply)",
+        refillLabel = formatFriendlyDate(refillCalendar)
     )
 }
 
@@ -660,12 +709,11 @@ private fun countPlannedRemindersPerDay(
 private fun buildFriendlyStartLabel(startCalendar: Calendar): String {
     val today = Calendar.getInstance()
     val tomorrow = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }
-    val prefix = when {
-        sameDay(startCalendar, today) -> "Starts today"
-        sameDay(startCalendar, tomorrow) -> "Starts tomorrow"
-        else -> "Starts"
+    return when {
+        sameDay(startCalendar, today) -> "Today, ${formatFriendlyDate(startCalendar)}"
+        sameDay(startCalendar, tomorrow) -> "Tomorrow, ${formatFriendlyDate(startCalendar)}"
+        else -> formatFriendlyDate(startCalendar)
     }
-    return "$prefix, ${formatFriendlyDate(startCalendar)}"
 }
 
 private fun formatFriendlyDate(calendar: Calendar): String {

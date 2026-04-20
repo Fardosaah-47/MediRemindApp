@@ -22,4 +22,12 @@ class DoseScheduleRepository(context: Context) {
     suspend fun updateDoseSchedule(doseSchedule: DoseSchedule) {
         doseScheduleDao.updateDoseSchedule(doseSchedule)
     }
+
+    suspend fun deleteDoseSchedule(doseSchedule: DoseSchedule) {
+        doseScheduleDao.deleteDoseSchedule(doseSchedule)
+    }
+
+    suspend fun getSchedulesForMedication(medicationId: Long): List<DoseSchedule> {
+        return doseScheduleDao.getSchedulesForMedication(medicationId)
+    }
 }
