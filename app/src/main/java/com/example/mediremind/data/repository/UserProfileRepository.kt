@@ -10,4 +10,13 @@ class UserProfileRepository(context: Context) {
     suspend fun getFirstUserProfile(): UserProfile? {
         return userProfileDao.getAllUserProfiles().firstOrNull()
     }
+
+    suspend fun saveUserProfile(userProfile: UserProfile): Long {
+        return if (userProfile.id == 0L) {
+            userProfileDao.insertUserProfile(userProfile)
+        } else {
+            userProfileDao.updateUserProfile(userProfile)
+            userProfile.id
+        }
+    }
 }

@@ -41,6 +41,7 @@ import com.example.mediremind.ui.screen.home.HomeScreen
 import com.example.mediremind.ui.screen.medication.MedicationFormScreen
 import com.example.mediremind.ui.screen.medication.MedicationListScreen
 import com.example.mediremind.ui.screen.medication.QrImportScreen
+import com.example.mediremind.ui.screen.profile.PatientProfileScreen
 import com.example.mediremind.ui.screen.reminder.CaregiverScanScreen
 import com.example.mediremind.ui.screen.reminder.DoseLogDisplayItem
 import com.example.mediremind.ui.screen.reminder.DoseLoggingItem
@@ -72,6 +73,7 @@ private enum class AppScreen {
     SCHEDULE_FORM,
     DOSE_LOGGING,
     QR_IMPORT,
+    PROFILE,
     PATIENT_REPORT,
     CAREGIVER_SCAN
 }
@@ -203,25 +205,35 @@ class MainActivity : ComponentActivity() {
             }
 
             LaunchedEffect(currentScreen, timeRefreshKey) {
-                if (currentScreen == AppScreen.MEDICATION_LIST) {
+                if (currentScreen == AppScreen.HOME || currentScreen == AppScreen.MEDICATION_LIST) {
                     medications = medicationRepository.getAllMedications()
                 }
                 if (
+                    currentScreen == AppScreen.HOME ||
                     currentScreen == AppScreen.SCHEDULE_LIST ||
                     currentScreen == AppScreen.SCHEDULE_FORM ||
                     currentScreen == AppScreen.DOSE_LOGGING ||
+                    currentScreen == AppScreen.PROFILE ||
                     currentScreen == AppScreen.PATIENT_REPORT
                 ) {
                     medications = medicationRepository.getAllMedications()
                 }
+                if (currentScreen == AppScreen.HOME || currentScreen == AppScreen.PROFILE || currentScreen == AppScreen.PATIENT_REPORT) {
+                    userProfile = userProfileRepository.getFirstUserProfile()
+                }
                 if (
+                    currentScreen == AppScreen.HOME ||
                     currentScreen == AppScreen.SCHEDULE_LIST ||
                     currentScreen == AppScreen.DOSE_LOGGING ||
                     currentScreen == AppScreen.PATIENT_REPORT
                 ) {
                     schedules = doseScheduleRepository.getAllDoseSchedules()
                 }
-                if (currentScreen == AppScreen.DOSE_LOGGING || currentScreen == AppScreen.PATIENT_REPORT) {
+                if (
+                    currentScreen == AppScreen.HOME ||
+                    currentScreen == AppScreen.DOSE_LOGGING ||
+                    currentScreen == AppScreen.PATIENT_REPORT
+                ) {
                     doseLogs = doseLogRepository.getAllDoseLogs()
                 }
                 if (
@@ -291,6 +303,9 @@ class MainActivity : ComponentActivity() {
                         },
                         onStartQrImportFlow = {
                             currentScreen = AppScreen.QR_IMPORT
+                        },
+                        onStartProfileFlow = {
+                            currentScreen = AppScreen.PROFILE
                         },
                         onStartPatientReportFlow = {
                             currentScreen = AppScreen.PATIENT_REPORT
@@ -506,6 +521,13 @@ class MainActivity : ComponentActivity() {
                         onBackFromQrImport = {
                             currentScreen = AppScreen.HOME
                         },
+                        onSaveUserProfile = { profile ->
+                            coroutineScope.launch {
+                                userProfileRepository.saveUserProfile(profile)
+                                userProfile = userProfileRepository.getFirstUserProfile()
+                                currentScreen = AppScreen.HOME
+                            }
+                        },
                         onScanMedicationQr = {
                             val options = GmsBarcodeScannerOptions.Builder()
                                 .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
@@ -603,6 +625,7 @@ class MainActivity : ComponentActivity() {
                                         error.message ?: "Caregiver QR scan failed. Try again."
                                 }
                         },
+                        userProfile = userProfile,
                         onBackFromCaregiverQr = {
                             currentScreen = AppScreen.HOME
                         }
@@ -628,6 +651,7 @@ private fun AppContent(
     onStartScheduleFlow: () -> Unit,
     onStartDoseLoggingFlow: () -> Unit,
     onStartQrImportFlow: () -> Unit,
+    onStartProfileFlow: () -> Unit,
     onStartPatientReportFlow: () -> Unit,
     onStartCaregiverScanFlow: () -> Unit,
     onOpenMedicationForm: () -> Unit,
@@ -650,22 +674,45 @@ private fun AppContent(
     qrImportMessage: String,
     qrRawPreview: String,
     onBackFromQrImport: () -> Unit,
+    onSaveUserProfile: (UserProfile) -> Unit,
     onScanMedicationQr: () -> Unit,
     caregiverReportSummary: CaregiverReportSummary?,
     caregiverReportQr: ImageBitmap?,
     scannedCaregiverReportSummary: CaregiverReportSummary?,
     scannedCaregiverReportMessage: String,
     onScanCaregiverReportQr: () -> Unit,
+    userProfile: UserProfile?,
     onBackFromCaregiverQr: () -> Unit
 ) {
     when (currentScreen) {
         AppScreen.HOME -> {
+            val todayDate = currentDateOnly()
+            val dueTodayCount = schedules.count { schedule ->
+                isScheduleActiveOnDate(schedule, todayDate)
+            }
+            val loggedTodayCount = doseLogs.count { log ->
+                log.logDate == todayDate
+            }
+            val nextStepLabel = when {
+                userProfile == null -> "Save the patient profile first so reports and caregiver sharing use the right patient name."
+                medications.isEmpty() -> "Add the patient's medicines next so MediRemind can start tracking treatment."
+                schedules.isEmpty() -> "Set the dose schedule next so the app knows when each medicine should be taken."
+                dueTodayCount > loggedTodayCount -> "Open Dose Logging to review the doses that still need action today."
+                else -> "Open Patient Report or Caregiver Scan to review the latest adherence summary."
+            }
             HomeScreen(
                 modifier = modifier,
+                patientName = userProfile?.fullName,
+                medicationCount = medications.size,
+                scheduleCount = schedules.size,
+                dueTodayCount = dueTodayCount,
+                loggedTodayCount = loggedTodayCount,
+                nextStepLabel = nextStepLabel,
                 onStartMedicationFlow = onStartMedicationFlow,
                 onStartScheduleFlow = onStartScheduleFlow,
                 onStartDoseLoggingFlow = onStartDoseLoggingFlow,
                 onStartQrImportFlow = onStartQrImportFlow,
+                onStartProfileFlow = onStartProfileFlow,
                 onStartPatientReportFlow = onStartPatientReportFlow,
                 onStartCaregiverScanFlow = onStartCaregiverScanFlow
             )
@@ -826,6 +873,15 @@ private fun AppContent(
                 rawScanPreview = qrRawPreview,
                 onScanQrClick = onScanMedicationQr,
                 onBackClick = onBackFromQrImport
+            )
+        }
+
+        AppScreen.PROFILE -> {
+            PatientProfileScreen(
+                modifier = modifier,
+                existingProfile = userProfile,
+                onSaveProfile = onSaveUserProfile,
+                onBackClick = onBackFromCaregiverQr
             )
         }
 
