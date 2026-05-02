@@ -12,18 +12,34 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.material.icons.outlined.Summarize
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.mediremind.data.repository.CaregiverMedicationSummary
 import com.example.mediremind.data.repository.CaregiverReportSummary
+import com.example.mediremind.ui.components.IconBadge
+import com.example.mediremind.ui.components.InfoCard
+import com.example.mediremind.ui.components.MediRemindTopBar
+import com.example.mediremind.ui.components.SectionLabel
+import com.example.mediremind.ui.components.StatusChip
+import com.example.mediremind.ui.components.SurfaceCard
+import com.example.mediremind.ui.theme.AlertCoral
+import com.example.mediremind.ui.theme.ClinicTeal
 import com.example.mediremind.ui.theme.MediRemindTheme
 
 @Composable
@@ -36,102 +52,104 @@ fun CaregiverScanScreen(
 ) {
     val scrollState = rememberScrollState()
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Top
-    ) {
-        Text(
-            text = "Caregiver Scan",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "Scan the patient's report QR and open a simple medication summary on this phone.",
-            style = MaterialTheme.typography.bodyMedium
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
+    Scaffold(
+        topBar = {
+            MediRemindTopBar(
+                title = "Caregiver Scan",
+                onBackClick = onBackClick
             )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { innerPadding ->
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(innerPadding)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.Top
         ) {
-            Column(
-                modifier = Modifier.padding(20.dp)
-            ) {
+            InfoCard(title = "How this works") {
                 Text(
-                    text = "How this works",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    text = "Open the patient report on the patient phone, scan the QR here, then review the summary below.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Text(text = "1. Open the patient report on the patient phone.")
-                Text(text = "2. Scan the caregiver QR from this screen.")
-                Text(text = "3. Review the adherence summary below.")
             }
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-        Button(
-            onClick = onScanReportQrClick,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(text = "Scan Patient Report QR")
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        OutlinedButton(
-            onClick = onBackClick,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(text = "Return To Dashboard")
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        if (scannedReportSummary != null) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+            Button(
+                onClick = onScanReportQrClick,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(
-                    modifier = Modifier.padding(20.dp)
-                ) {
-                    Text(
-                        text = scannedReportSummary.patientName,
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                Text(text = "Scan Patient Report QR")
+            }
 
-                    if (!scannedReportSummary.caregiverName.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+
+            if (scannedReportSummary != null) {
+                SurfaceCard {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        IconBadge(
+                            icon = Icons.Outlined.Summarize,
+                            size = 48
+                        )
+                        Column {
+                            Text(
+                                text = scannedReportSummary.patientName,
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+
+                            if (!scannedReportSummary.caregiverName.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                StatusChip(label = "Caregiver: ${scannedReportSummary.caregiverName}")
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                androidx.compose.material3.Icon(
+                                    imageVector = Icons.Outlined.CalendarToday,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.height(14.dp)
+                                )
+                                Text(
+                                    text = "Report date: ${scannedReportSummary.reportDate}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
                         Text(
-                            text = "Caregiver: ${scannedReportSummary.caregiverName}",
-                            style = MaterialTheme.typography.bodyMedium
+                            text = "Adherence",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                        Text(
+                            text = "${scannedReportSummary.adherenceRate}%",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = caregiverRateColor(scannedReportSummary.adherenceRate)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Text(
-                        text = "Report date: ${scannedReportSummary.reportDate}",
-                        style = MaterialTheme.typography.bodyMedium
+                    Spacer(modifier = Modifier.height(6.dp))
+                    LinearProgressIndicator(
+                        progress = { (scannedReportSummary.adherenceRate / 100f).coerceIn(0f, 1f) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp),
+                        color = caregiverRateColor(scannedReportSummary.adherenceRate),
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        strokeCap = StrokeCap.Round
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -161,65 +179,52 @@ fun CaregiverScanScreen(
                         rightValue = scannedReportSummary.totalSnoozed.toString()
                     )
                 }
-            }
 
-            if (scannedReportSummary.medicationSummaries.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(16.dp))
+                if (scannedReportSummary.medicationSummaries.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    SectionLabel(text = "Medication breakdown")
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp)
-                    ) {
-                        Text(
-                            text = "Medication breakdown",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary
+                    scannedReportSummary.medicationSummaries.forEachIndexed { index, medication ->
+                        MedicationSummaryCard(medication = medication)
+                        if (index != scannedReportSummary.medicationSummaries.lastIndex) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                        }
+                    }
+                }
+            } else {
+                SurfaceCard {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        IconBadge(
+                            icon = Icons.Outlined.QrCodeScanner,
+                            size = 44
                         )
+                        Column {
+                            Text(
+                                text = "Waiting for scan",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
 
-                        scannedReportSummary.medicationSummaries.forEachIndexed { index, medication ->
-                            MedicationSummaryCard(medication = medication)
-                            if (index != scannedReportSummary.medicationSummaries.lastIndex) {
-                                Spacer(modifier = Modifier.height(10.dp))
-                            }
+                            Text(
+                                text = scannedReportMessage,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
             }
-        } else {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(20.dp)
-                ) {
-                    Text(
-                        text = "Waiting for scan",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = scannedReportMessage,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
         }
     }
+}
+
+private fun caregiverRateColor(rate: Int): Color = when {
+    rate >= 80 -> ClinicTeal
+    rate >= 50 -> Color(0xFFD97706)
+    else -> AlertCoral
 }
 
 @Composable
@@ -282,31 +287,29 @@ private fun ReportStatCard(
 private fun MedicationSummaryCard(
     medication: CaregiverMedicationSummary
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.background
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text(
-                text = medication.name,
-                style = MaterialTheme.typography.titleSmall
+    SurfaceCard {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            IconBadge(
+                icon = Icons.Outlined.Groups,
+                size = 40
             )
+            Column {
+                Text(
+                    text = medication.name,
+                    style = MaterialTheme.typography.titleSmall
+                )
 
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-            Text(
-                text = "Taken ${medication.taken} | Skipped ${medication.skipped}",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Text(
-                text = "Snoozed ${medication.snoozed} | Missed ${medication.missed}",
-                style = MaterialTheme.typography.bodyMedium
-            )
+                Text(
+                    text = "Taken ${medication.taken} | Skipped ${medication.skipped}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    text = "Snoozed ${medication.snoozed} | Missed ${medication.missed}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
         }
     }
 }

@@ -2,10 +2,10 @@ package com.example.mediremind.ui.screen.schedule
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -23,18 +24,24 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.mediremind.data.model.DoseFrequency
 import com.example.mediremind.data.model.DoseSchedule
 import com.example.mediremind.data.model.Medication
+import com.example.mediremind.ui.components.InfoCard
+import com.example.mediremind.ui.components.MediRemindTopBar
+import com.example.mediremind.ui.components.SectionLabel
+import com.example.mediremind.ui.components.SurfaceCard
 import com.example.mediremind.ui.theme.MediRemindTheme
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -114,359 +121,317 @@ fun DoseScheduleFormScreen(
         }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Top
-    ) {
-        Text(
-            text = if (isEditing) "Edit Schedule" else "Dose Schedule",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = if (isEditing) {
-                "Adjust the reminder time and treatment dates for this saved schedule."
-            } else {
-                "Set when the patient should take each medication."
-            },
-            style = MaterialTheme.typography.bodyMedium
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Text(
-            text = "Choose Medication",
-            style = MaterialTheme.typography.titleMedium
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        if (medications.isEmpty()) {
-            Text(
-                text = "Save at least one medication first before creating a schedule.",
-                style = MaterialTheme.typography.bodyMedium
+    Scaffold(
+        topBar = {
+            MediRemindTopBar(
+                title = if (isEditing) "Edit Schedule" else "Dose Schedule",
+                onBackClick = onCancel
             )
-        } else {
-            ExposedDropdownMenuBox(
-                expanded = medicationMenuExpanded.value,
-                onExpandedChange = { medicationMenuExpanded.value = !medicationMenuExpanded.value }
-            ) {
-                OutlinedTextField(
-                    value = selectedMedicationName,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Medication") },
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = medicationMenuExpanded.value)
-                    },
-                    modifier = Modifier
-                        .menuAnchor()
-                        .fillMaxWidth()
-                )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 40.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                SectionLabel(text = "MEDICATION")
+                Spacer(modifier = Modifier.height(8.dp))
 
-                DropdownMenu(
-                    expanded = medicationMenuExpanded.value,
-                    onDismissRequest = { medicationMenuExpanded.value = false },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    medications.forEach { medication ->
-                        DropdownMenuItem(
-                            text = { Text(medication.name) },
-                            onClick = {
-                                selectedMedicationId.value = medication.id
-                                medicationMenuExpanded.value = false
-                            }
+                if (medications.isEmpty()) {
+                    SurfaceCard {
+                        Text(
+                            text = "Save at least one medication first before creating a schedule.",
+                            style = MaterialTheme.typography.bodyMedium
                         )
                     }
-                }
-            }
-        }
-        if (!isEditing) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Default times load automatically. You can still tap and change them.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-
-        if (!isEditing && !frequencyMismatchWarning.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = frequencyMismatchWarning,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error
-            )
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Text(
-            text = "Choose Frequency",
-            style = MaterialTheme.typography.titleMedium
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        if (isEditing) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = selectedFrequency.value.name.lowercase().replace('_', ' '),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "To change once daily, twice daily, or three times daily, update the medication instructions in Medication Setup. The linked schedule pattern will refresh there automatically.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        } else {
-            DoseFrequency.entries.forEach { frequency ->
-                val isSelected = selectedFrequency.value == frequency
-                val label = frequency.name.lowercase().replace('_', ' ')
-                if (isSelected) {
-                    Button(
-                        onClick = { selectedFrequency.value = frequency },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(text = label)
-                    }
                 } else {
-                    OutlinedButton(
-                        onClick = { selectedFrequency.value = frequency },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(text = label)
+                    SurfaceCard {
+                        ExposedDropdownMenuBox(
+                            expanded = medicationMenuExpanded.value,
+                            onExpandedChange = { medicationMenuExpanded.value = !medicationMenuExpanded.value }
+                        ) {
+                            OutlinedTextField(
+                                value = selectedMedicationName,
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Medication") },
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = medicationMenuExpanded.value)
+                                },
+                                modifier = Modifier
+                                    .menuAnchor()
+                                    .fillMaxWidth()
+                            )
+
+                            DropdownMenu(
+                                expanded = medicationMenuExpanded.value,
+                                onDismissRequest = { medicationMenuExpanded.value = false },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                medications.forEach { medication ->
+                                    DropdownMenuItem(
+                                        text = { Text(medication.name) },
+                                        onClick = {
+                                            selectedMedicationId.value = medication.id
+                                            medicationMenuExpanded.value = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
+            }
+
+            item {
+                SectionLabel(text = "FREQUENCY")
                 Spacer(modifier = Modifier.height(8.dp))
-            }
-        }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Text(
-            text = "Treatment Period",
-            style = MaterialTheme.typography.titleMedium
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        OutlinedButton(
-            onClick = {
-                openDatePicker(
-                    context = context,
-                    initialValue = startDate.value
-                ) { selectedDate ->
-                    startDate.value = selectedDate
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(text = "Start Date: ${formatDateForDisplay(startDate.value)}")
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        OutlinedButton(
-            onClick = {
-                openDatePicker(
-                    context = context,
-                    initialValue = endDate.value
-                ) { selectedDate ->
-                    endDate.value = selectedDate
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(text = "End Date: ${formatDateForDisplay(endDate.value)}")
-        }
-
-        if (!hasValidTreatmentPeriod) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "End date must be the same day as the start date or later.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error
-            )
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        OutlinedButton(
-            onClick = {
-                openTimePicker(
-                    context = context,
-                    initialValue = firstReminderTime.value
-                ) { selectedTime ->
-                    firstReminderTime.value = selectedTime
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                text = if (firstReminderTime.value.isBlank()) {
-                    "Pick $firstTimeLabel"
+                if (isEditing) {
+                    InfoCard(
+                        title = "Saved frequency"
+                    ) {
+                        Text(
+                            text = selectedFrequency.value.name.lowercase().replace('_', ' '),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "To change once daily, twice daily, or three times daily, update the medication instructions in Medication Setup. The linked schedule pattern will refresh there automatically.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
                 } else {
-                    "$firstTimeLabel: ${firstReminderTime.value}"
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DoseFrequency.entries.forEach { frequency ->
+                            val isSelected = selectedFrequency.value == frequency
+                            val label = frequency.name.lowercase().replace('_', ' ')
+                            if (isSelected) {
+                                Button(
+                                    onClick = { selectedFrequency.value = frequency },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(text = label)
+                                }
+                            } else {
+                                OutlinedButton(
+                                    onClick = { selectedFrequency.value = frequency },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(text = label)
+                                }
+                            }
+                        }
+                    }
                 }
-            )
-        }
 
-        if (!isEditing && (
-            selectedFrequency.value == DoseFrequency.TWICE_DAILY ||
-            selectedFrequency.value == DoseFrequency.THREE_TIMES_DAILY
-        )) {
-            Spacer(modifier = Modifier.height(12.dp))
-
-            OutlinedButton(
-                onClick = {
-                    openTimePicker(
-                        context = context,
-                        initialValue = secondReminderTime.value
-                    ) { selectedTime ->
-                        secondReminderTime.value = selectedTime
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = if (secondReminderTime.value.isBlank()) {
-                        "Pick $secondTimeLabel"
-                    } else {
-                        "$secondTimeLabel: ${secondReminderTime.value}"
-                    }
-                )
-            }
-        }
-
-        if (!isEditing && selectedFrequency.value == DoseFrequency.THREE_TIMES_DAILY) {
-            Spacer(modifier = Modifier.height(12.dp))
-
-            OutlinedButton(
-                onClick = {
-                    openTimePicker(
-                        context = context,
-                        initialValue = thirdReminderTime.value
-                    ) { selectedTime ->
-                        thirdReminderTime.value = selectedTime
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = if (thirdReminderTime.value.isBlank()) {
-                        "Pick $thirdTimeLabel"
-                    } else {
-                        "$thirdTimeLabel: ${thirdReminderTime.value}"
-                    }
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        estimatedScheduleSummary?.let { summary ->
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
+                if (!isEditing) {
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Estimated Plan",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    EstimatedPlanRow(
-                        label = "Starts",
-                        value = summary.startLabel
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    EstimatedPlanRow(
-                        label = "Expected End",
-                        value = summary.endLabel
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    EstimatedPlanRow(
-                        label = "Refill Alert",
-                        value = summary.refillLabel
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "This timeline may shift later if real dose logs show skipped or missed doses.",
+                        text = "Default times load automatically. You can still change them.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
+
+                if (!frequencyMismatchWarning.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = frequencyMismatchWarning,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
-        }
+            item {
+                SectionLabel(text = "TREATMENT PERIOD")
+                Spacer(modifier = Modifier.height(8.dp))
+                SurfaceCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(
+                            onClick = {
+                                openDatePicker(
+                                    context = context,
+                                    initialValue = startDate.value
+                                ) { selectedDate ->
+                                    startDate.value = selectedDate
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(text = "Start Date: ${formatDateForDisplay(startDate.value)}")
+                        }
 
-        Button(
-            onClick = {
-                val medicationId = selectedMedicationId.value
-                if (medicationId != null) {
-                    val times = buildList {
-                        if (firstReminderTime.value.isNotBlank()) add(firstReminderTime.value)
-                        if (secondReminderTime.value.isNotBlank()) add(secondReminderTime.value)
-                        if (thirdReminderTime.value.isNotBlank()) add(thirdReminderTime.value)
-                    }
+                        OutlinedButton(
+                            onClick = {
+                                openDatePicker(
+                                    context = context,
+                                    initialValue = endDate.value
+                                ) { selectedDate ->
+                                    endDate.value = selectedDate
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(text = "End Date: ${formatDateForDisplay(endDate.value)}")
+                        }
 
-                    val schedules = times.map { time ->
-                        DoseSchedule(
-                            id = existingSchedule?.id ?: 0,
-                            medicationId = medicationId,
-                            time = time,
-                            frequency = selectedFrequency.value,
-                            startDate = startDate.value,
-                            endDate = endDate.value
-                        )
-                    }
-
-                    if (schedules.isNotEmpty() && hasValidTreatmentPeriod) {
-                        onSaveSchedules(schedules)
+                        if (!hasValidTreatmentPeriod) {
+                            Text(
+                                text = "End date must be the same day as the start date or later.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
                 }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = hasValidTreatmentPeriod
-        ) {
-            Text(text = if (isEditing) "Update Schedule" else "Save Schedule")
-        }
+            }
 
-        Spacer(modifier = Modifier.height(12.dp))
+            item {
+                SectionLabel(text = "REMINDER TIMES")
+                Spacer(modifier = Modifier.height(8.dp))
+                SurfaceCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(
+                            onClick = {
+                                openTimePicker(
+                                    context = context,
+                                    initialValue = firstReminderTime.value
+                                ) { selectedTime ->
+                                    firstReminderTime.value = selectedTime
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = if (firstReminderTime.value.isBlank()) {
+                                    "Pick $firstTimeLabel"
+                                } else {
+                                    "$firstTimeLabel: ${firstReminderTime.value}"
+                                }
+                            )
+                        }
 
-        Button(
-            onClick = onCancel,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(text = "Cancel")
+                        if (!isEditing && (
+                                selectedFrequency.value == DoseFrequency.TWICE_DAILY ||
+                                    selectedFrequency.value == DoseFrequency.THREE_TIMES_DAILY
+                                )
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    openTimePicker(
+                                        context = context,
+                                        initialValue = secondReminderTime.value
+                                    ) { selectedTime ->
+                                        secondReminderTime.value = selectedTime
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = if (secondReminderTime.value.isBlank()) {
+                                        "Pick $secondTimeLabel"
+                                    } else {
+                                        "$secondTimeLabel: ${secondReminderTime.value}"
+                                    }
+                                )
+                            }
+                        }
+
+                        if (!isEditing && selectedFrequency.value == DoseFrequency.THREE_TIMES_DAILY) {
+                            OutlinedButton(
+                                onClick = {
+                                    openTimePicker(
+                                        context = context,
+                                        initialValue = thirdReminderTime.value
+                                    ) { selectedTime ->
+                                        thirdReminderTime.value = selectedTime
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = if (thirdReminderTime.value.isBlank()) {
+                                        "Pick $thirdTimeLabel"
+                                    } else {
+                                        "$thirdTimeLabel: ${thirdReminderTime.value}"
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            estimatedScheduleSummary?.let { summary ->
+                item {
+                    InfoCard(
+                        title = "Estimated Plan"
+                    ) {
+                        EstimatedPlanRow(label = "Starts", value = summary.startLabel)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        EstimatedPlanRow(label = "Expected End", value = summary.endLabel)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        EstimatedPlanRow(label = "Refill Alert", value = summary.refillLabel)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "This timeline may shift later if real dose logs show skipped or missed doses.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+            }
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = {
+                            val medicationId = selectedMedicationId.value
+                            if (medicationId != null) {
+                                val times = buildList {
+                                    if (firstReminderTime.value.isNotBlank()) add(firstReminderTime.value)
+                                    if (secondReminderTime.value.isNotBlank()) add(secondReminderTime.value)
+                                    if (thirdReminderTime.value.isNotBlank()) add(thirdReminderTime.value)
+                                }
+
+                                val schedules = times.map { time ->
+                                    DoseSchedule(
+                                        id = existingSchedule?.id ?: 0,
+                                        medicationId = medicationId,
+                                        time = time,
+                                        frequency = selectedFrequency.value,
+                                        startDate = startDate.value,
+                                        endDate = endDate.value
+                                    )
+                                }
+
+                                if (schedules.isNotEmpty() && hasValidTreatmentPeriod) {
+                                    onSaveSchedules(schedules)
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = hasValidTreatmentPeriod
+                    ) {
+                        Text(text = if (isEditing) "Update Schedule" else "Save Schedule")
+                    }
+
+                    OutlinedButton(
+                        onClick = onCancel,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(text = "Cancel")
+                    }
+                }
+            }
         }
     }
 }
@@ -480,7 +445,7 @@ private fun DoseScheduleFormScreenPreview() {
 }
 
 private fun openTimePicker(
-    context: android.content.Context,
+    context: Context,
     initialValue: String,
     onTimeSelected: (String) -> Unit
 ) {
@@ -501,7 +466,7 @@ private fun openTimePicker(
 }
 
 private fun openDatePicker(
-    context: android.content.Context,
+    context: Context,
     initialValue: String,
     onDateSelected: (String) -> Unit
 ) {
@@ -597,12 +562,13 @@ private fun EstimatedPlanRow(
         Text(
             text = "$label:",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
             modifier = Modifier.width(96.dp)
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSecondaryContainer
         )
     }
 }

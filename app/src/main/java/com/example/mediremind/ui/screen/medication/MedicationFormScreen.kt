@@ -3,24 +3,33 @@ package com.example.mediremind.ui.screen.medication
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.LockOpen
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,10 +39,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.mediremind.data.model.Medication
 import com.example.mediremind.data.model.MedicationForm
+import com.example.mediremind.ui.components.MediRemindTopBar
+import com.example.mediremind.ui.components.SectionLabel
+import com.example.mediremind.ui.components.SurfaceCard
 import com.example.mediremind.ui.theme.MediRemindTheme
 
 @Composable
@@ -46,7 +60,6 @@ fun MedicationFormScreen(
     onDeleteMedication: (Medication) -> Unit = {},
     onCancel: () -> Unit = {}
 ) {
-    val scrollState = rememberScrollState()
     val medicationName = remember(existingMedication?.id) {
         mutableStateOf(existingMedication?.name.orEmpty())
     }
@@ -81,248 +94,251 @@ fun MedicationFormScreen(
     val isQrMedication = existingMedication?.isQrImported == true
     val areProtectedQrFieldsReadOnly = isQrMedication && !qrFieldsUnlocked.value
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Top
-    ) {
-        Text(
-            text = if (isEditing) "Edit Medication" else "Add Medication",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = if (isEditing) {
-                if (isQrMedication) {
-                    "This medication came from a pharmacy QR. Key details stay protected unless you unlock them."
-                } else {
-                    "Update medication details so reminders and refill tracking stay accurate."
-                }
-            } else {
-                "Enter medication details for reminders and refill tracking."
-            },
-            style = MaterialTheme.typography.bodyMedium
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        if (isQrMedication) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "Loaded From Pharmacy QR",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = if (areProtectedQrFieldsReadOnly) {
-                            "Name, form, and dosage are locked by default. Stock and refill values can still be updated."
-                        } else {
-                            "QR protection is temporarily unlocked for this edit."
-                        },
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    OutlinedButton(
-                        onClick = { showQrUnlockConfirmation.value = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !qrFieldsUnlocked.value
-                    ) {
-                        Text(
-                            text = if (qrFieldsUnlocked.value) {
-                                "QR Details Unlocked"
+    Scaffold(
+        topBar = {
+            MediRemindTopBar(
+                title = if (isEditing) "Edit Medication" else "Add Medication",
+                onBackClick = onCancel
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 40.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            if (isQrMedication) {
+                item {
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (areProtectedQrFieldsReadOnly) {
+                                MaterialTheme.colorScheme.secondaryContainer
                             } else {
-                                "Unlock QR Details"
+                                MaterialTheme.colorScheme.primaryContainer
                             }
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (areProtectedQrFieldsReadOnly) {
+                                    Icons.Outlined.Lock
+                                } else {
+                                    Icons.Outlined.LockOpen
+                                },
+                                contentDescription = null,
+                                tint = if (areProtectedQrFieldsReadOnly) {
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                },
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (areProtectedQrFieldsReadOnly) {
+                                        "Pharmacy QR Protected"
+                                    } else {
+                                        "QR Protection Unlocked"
+                                    },
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    color = if (areProtectedQrFieldsReadOnly) {
+                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    }
+                                )
+                                Text(
+                                    text = if (areProtectedQrFieldsReadOnly) {
+                                        "Name, form, and dosage are locked. Stock fields are still editable."
+                                    } else {
+                                        "All fields are now editable for this session."
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (areProtectedQrFieldsReadOnly) {
+                                        MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                                    } else {
+                                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                    }
+                                )
+                            }
+                            if (!qrFieldsUnlocked.value) {
+                                TextButton(onClick = { showQrUnlockConfirmation.value = true }) {
+                                    Text("Unlock", style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                SectionLabel(text = "MEDICATION DETAILS")
+                Spacer(modifier = Modifier.height(8.dp))
+                SurfaceCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        FormField(
+                            value = medicationName.value,
+                            onValueChange = { medicationName.value = it },
+                            label = "Medication Name",
+                            readOnly = areProtectedQrFieldsReadOnly
+                        )
+                        FormField(
+                            value = medicationForm.value,
+                            onValueChange = { medicationForm.value = it },
+                            label = "Form (e.g. Tablet, Syrup)",
+                            readOnly = areProtectedQrFieldsReadOnly
+                        )
+                        FormField(
+                            value = dosage.value,
+                            onValueChange = { dosage.value = it },
+                            label = "Dosage Instructions",
+                            readOnly = areProtectedQrFieldsReadOnly
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        OutlinedTextField(
-            value = medicationName.value,
-            onValueChange = { medicationName.value = it },
-            label = { Text("Medication Name") },
-            readOnly = areProtectedQrFieldsReadOnly,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        OutlinedTextField(
-            value = medicationForm.value,
-            onValueChange = { medicationForm.value = it },
-            label = { Text("Medication Form e.g. Tablet, Syrup") },
-            readOnly = areProtectedQrFieldsReadOnly,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        OutlinedTextField(
-            value = dosage.value,
-            onValueChange = { dosage.value = it },
-            label = { Text("Dosage Instructions") },
-            readOnly = areProtectedQrFieldsReadOnly,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        OutlinedTextField(
-            value = stockAmount.value,
-            onValueChange = { stockAmount.value = it },
-            label = { Text("Current Stock Amount") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        OutlinedTextField(
-            value = stockUnit.value,
-            onValueChange = { stockUnit.value = it },
-            label = { Text("Stock Unit e.g. pills, mL, bottles") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        OutlinedTextField(
-            value = refillAlertAt.value,
-            onValueChange = { refillAlertAt.value = it },
-            label = { Text("Refill Alert At") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
-                Text(
-                    text = "Medication Reference Photo",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
+            item {
+                SectionLabel(text = "STOCK & REFILL")
                 Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "Take a camera photo of the real bottle, blister pack, or medicine so the Taken flow can compare against it.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                if (!referenceImageUri.isNullOrBlank()) {
-                    MedicationReferencePhotoPreview(imageUri = referenceImageUri)
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-
-                Button(
-                    onClick = onTakeReferencePhoto,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = if (referenceImageUri.isNullOrBlank()) {
-                            "Take Reference Photo"
-                        } else {
-                            "Retake Reference Photo"
+                SurfaceCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            FormField(
+                                value = stockAmount.value,
+                                onValueChange = { stockAmount.value = it },
+                                label = "Current Stock",
+                                modifier = Modifier.weight(1f)
+                            )
+                            FormField(
+                                value = stockUnit.value,
+                                onValueChange = { stockUnit.value = it },
+                                label = "Unit",
+                                modifier = Modifier.weight(1f)
+                            )
                         }
-                    )
+                        FormField(
+                            value = refillAlertAt.value,
+                            onValueChange = { refillAlertAt.value = it },
+                            label = "Alert when stock reaches"
+                        )
+                    }
+                }
+            }
+
+            item {
+                SectionLabel(text = "REFERENCE PHOTO")
+                Spacer(modifier = Modifier.height(8.dp))
+                SurfaceCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text = "Take a photo of the real bottle or blister pack. This is used to verify doses during logging.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (!referenceImageUri.isNullOrBlank()) {
+                            MedicationReferencePhotoPreview(imageUri = referenceImageUri)
+                        }
+                        Button(
+                            onClick = onTakeReferencePhoto,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(vertical = 14.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.CameraAlt,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (referenceImageUri.isNullOrBlank()) {
+                                    "Take Reference Photo"
+                                } else {
+                                    "Retake Photo"
+                                },
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = {
+                            onSaveMedication(
+                                Medication(
+                                    id = existingMedication?.id ?: 0,
+                                    name = medicationName.value.ifBlank { "Untitled Medication" },
+                                    form = parseMedicationForm(medicationForm.value),
+                                    dosage = dosage.value.ifBlank { "Not specified" },
+                                    currentStockAmount = stockAmount.value.toDoubleOrNull() ?: 0.0,
+                                    stockUnit = stockUnit.value.ifBlank { "units" },
+                                    refillAlertAt = refillAlertAt.value.toDoubleOrNull() ?: 0.0,
+                                    referenceImageUri = referenceImageUri,
+                                    isQrImported = existingMedication?.isQrImported ?: false
+                                )
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        contentPadding = PaddingValues(vertical = 16.dp)
+                    ) {
+                        Text(
+                            text = if (isEditing) "Update Medication" else "Save Medication",
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+
+                    if (existingMedication != null) {
+                        OutlinedButton(
+                            onClick = { showDeleteConfirmation.value = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(vertical = 14.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
+                        ) {
+                            Text(
+                                text = "Delete Medication",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
                 }
             }
         }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Button(
-            onClick = {
-                val medication = Medication(
-                    id = existingMedication?.id ?: 0,
-                    name = medicationName.value.ifBlank { "Untitled Medication" },
-                    form = parseMedicationForm(medicationForm.value),
-                    dosage = dosage.value.ifBlank { "Not specified" },
-                    currentStockAmount = stockAmount.value.toDoubleOrNull() ?: 0.0,
-                    stockUnit = stockUnit.value.ifBlank { "units" },
-                    refillAlertAt = refillAlertAt.value.toDoubleOrNull() ?: 0.0,
-                    referenceImageUri = referenceImageUri,
-                    isQrImported = existingMedication?.isQrImported ?: false
-                )
-                onSaveMedication(medication)
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(text = if (isEditing) "Update Medication" else "Save Medication")
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Button(
-            onClick = onCancel,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(text = "Cancel")
-        }
-
-        if (existingMedication != null) {
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Button(
-                onClick = { showDeleteConfirmation.value = true },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(text = "Delete Medication")
-            }
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
     }
 
     if (existingMedication != null && showDeleteConfirmation.value) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirmation.value = false },
             title = {
-                Text(text = "Delete medication?")
+                Text(text = "Delete ${existingMedication.name}?")
             },
             text = {
                 Column {
                     Text(
-                        text = "Are you sure you want to delete ${existingMedication.name}? This will also remove its linked schedules and dose logs. Proceed with caution."
+                        text = "This will also remove linked schedules and dose logs. This cannot be undone."
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = "Why are you deleting it?",
-                        style = MaterialTheme.typography.titleSmall
+                        text = "Reason for deletion:",
+                        style = MaterialTheme.typography.labelMedium
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -330,18 +346,19 @@ fun MedicationFormScreen(
                     deleteReasonOptions().forEach { reason ->
                         OutlinedButton(
                             onClick = { selectedDeleteReason.value = reason },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = if (selectedDeleteReason.value == reason) {
-                                    "Selected: $reason"
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 6.dp),
+                            colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                                containerColor = if (selectedDeleteReason.value == reason) {
+                                    MaterialTheme.colorScheme.primaryContainer
                                 } else {
-                                    reason
+                                    MaterialTheme.colorScheme.surface
                                 }
                             )
+                        ) {
+                            Text(text = reason)
                         }
-
-                        Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
             },
@@ -378,7 +395,7 @@ fun MedicationFormScreen(
             },
             text = {
                 Text(
-                    text = "This medication was set by a pharmacy QR. Are you sure you want to change those details?"
+                    text = "These details were set from a pharmacy QR. Editing them may cause discrepancies with the prescription. Are you sure?"
                 )
             },
             confirmButton = {
@@ -424,6 +441,37 @@ private fun deleteReasonOptions(): List<String> {
     )
 }
 
+@Composable
+private fun FormField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    readOnly: Boolean = false
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        readOnly = readOnly,
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        singleLine = true,
+        trailingIcon = if (readOnly) {
+            {
+                Icon(
+                    imageVector = Icons.Outlined.Lock,
+                    contentDescription = "Locked",
+                    tint = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        } else {
+            null
+        }
+    )
+}
+
 @Preview(showBackground = true)
 @Composable
 private fun MedicationFormScreenPreview() {
@@ -451,8 +499,8 @@ private fun MedicationReferencePhotoPreview(
             bitmap = bitmap.asImageBitmap(),
             contentDescription = "Medication reference photo",
             modifier = modifier
-                .size(120.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .size(100.dp)
+                .clip(RoundedCornerShape(14.dp))
         )
     } else {
         Text(

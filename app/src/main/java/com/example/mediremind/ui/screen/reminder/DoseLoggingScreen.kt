@@ -3,37 +3,59 @@ package com.example.mediremind.ui.screen.reminder
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AssignmentTurnedIn
+import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.LocalHospital
+import androidx.compose.material.icons.outlined.NotificationsPaused
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.example.mediremind.data.model.DoseStatus
+import com.example.mediremind.ui.components.InfoCard
+import com.example.mediremind.ui.components.IconBadge
+import com.example.mediremind.ui.components.MediRemindTopBar
+import com.example.mediremind.ui.components.SectionLabel
+import com.example.mediremind.ui.components.StatusChip
+import com.example.mediremind.ui.components.SurfaceCard
 import com.example.mediremind.ui.theme.MediRemindTheme
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -99,7 +121,6 @@ fun DoseLoggingScreen(
     onLogDose: (DoseLoggingItem, DoseStatus) -> Unit = { _, _ -> },
     onBackClick: () -> Unit = {}
 ) {
-    val scrollState = rememberScrollState()
     var selectedHistoryRange by rememberSaveable { mutableStateOf(LogHistoryRange.WEEK) }
     val filteredRecentLogs = remember(recentLogs, selectedHistoryRange) {
         filterDoseLogsForRange(recentLogs, selectedHistoryRange)
@@ -111,441 +132,526 @@ fun DoseLoggingScreen(
         buildGroupedDateSections(filteredRecentLogs)
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Top
-    ) {
-        Text(
-            text = "Dose Logging",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
+    androidx.compose.material3.Scaffold(
+        topBar = {
+            MediRemindTopBar(
+                title = "Dose Logging",
+                onBackClick = onBackClick
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 40.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            todaySummary?.let { summary ->
+                item {
+                    TodaySummaryCard(summary = summary)
+                }
+            }
 
-        Spacer(modifier = Modifier.height(8.dp))
+            if (pendingDoseVerification != null) {
+                item {
+                    VerificationStatusCard(verification = pendingDoseVerification)
+                }
 
-        Text(
-            text = "Record whether each medication was taken, skipped, or snoozed.",
-            style = MaterialTheme.typography.bodyMedium
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        if (todaySummary != null) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "Today",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary
+                item {
+                    VerificationCompareCard(
+                        verification = pendingDoseVerification,
+                        onConfirmTaken = onConfirmTaken,
+                        onRetakeTakenPhoto = onRetakeTakenPhoto
                     )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = todaySummary.dateLabel,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        text = "Scheduled: ${todaySummary.totalScheduled}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        text = "Logged: ${todaySummary.completedCount}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        text = "Remaining: ${todaySummary.remainingCount}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        text = "Taken: ${todaySummary.takenCount}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        text = "Skipped: ${todaySummary.skippedCount}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    if (todaySummary.snoozedCount > 0) {
+                }
+            } else  if (statusMessage.isNotBlank()) {
+                item {
+                    InfoCard(title = "Dose Update") {
                         Text(
-                            text = "Snoozed: ${todaySummary.snoozedCount}",
-                            style = MaterialTheme.typography.bodyMedium
+                            text = statusMessage,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                     }
-                    if (todaySummary.missedCount > 0) {
-                        Text(
-                            text = "Missed: ${todaySummary.missedCount}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                    if (!todaySummary.nextDoseLabel.isNullOrBlank()) {
-                        Text(
-                            text = "Next: ${todaySummary.nextDoseLabel}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
+                }
+            }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+            item {
+                SectionLabel(text = "Remaining today")
+            }
 
-                    Text(
-                        text = todaySummary.summaryMessage,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
+            if (dueDoses.isEmpty()) {
+                item {
+                    EmptyDoseStateCard(
+                        title = "No more doses pending",
+                        message = "Everything scheduled for today has already been handled."
+                    )
+                }
+            } else {
+                items(dueDoses) { dose ->
+                    DueDoseCard(
+                        dose = dose,
+                        onTakeDosePhoto = { onTakeDosePhoto(dose) },
+                        onSkip = { onLogDose(dose, DoseStatus.SKIPPED) },
+                        onSnooze = { onLogDose(dose, DoseStatus.SNOOZED) }
                     )
                 }
             }
 
+            item {
+                SectionLabel(text = "Logged today")
+            }
+
+            if (todayLoggedDoses.isEmpty()) {
+                item {
+                    EmptyDoseStateCard(
+                        title = "Nothing logged yet",
+                        message = "Taken, skipped, and snoozed doses from today will appear here."
+                    )
+                }
+            } else {
+                loggedTodaySections.forEach { section ->
+                    item {
+                        StatusSectionHeader(
+                            title = section.title,
+                            count = section.logs.size
+                        )
+                    }
+
+                    items(buildGroupedDoseLogItems(section.logs)) { item ->
+                        GroupedDoseLogCard(item = item)
+                    }
+                }
+            }
+
+            item {
+                SectionLabel(text = "History")
+            }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    LogHistoryRange.entries.forEach { range ->
+                        val isSelected = range == selectedHistoryRange
+                        if (isSelected) {
+                            Button(
+                                onClick = { selectedHistoryRange = range },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(text = range.label)
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = { selectedHistoryRange = range },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(text = range.label)
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (filteredRecentLogs.isEmpty()) {
+                item {
+                    EmptyDoseStateCard(
+                        title = "No history in ${selectedHistoryRange.label.lowercase()}",
+                        message = "Recent dose activity will appear here once logging starts."
+                    )
+                }
+            } else {
+                historyDateSections.forEach { section ->
+                    item {
+                        Text(
+                            text = section.title,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    items(section.items) { item ->
+                        GroupedDoseLogCard(item = item)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TodaySummaryCard(
+    summary: TodayDoseSummaryDisplay
+) {
+    SurfaceCard {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconBadge(
+                icon = Icons.Outlined.AssignmentTurnedIn,
+                size = 44
+            )
+            Column {
+                Text(
+                    text = "Today",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = summary.dateLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Text(
+            text = summary.summaryMessage,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        SummaryStatRow(
+            leftLabel = "Scheduled",
+            leftValue = summary.totalScheduled.toString(),
+            rightLabel = "Logged",
+            rightValue = summary.completedCount.toString()
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        SummaryStatRow(
+            leftLabel = "Remaining",
+            leftValue = summary.remainingCount.toString(),
+            rightLabel = "Taken",
+            rightValue = summary.takenCount.toString()
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        SummaryStatRow(
+            leftLabel = "Skipped",
+            leftValue = summary.skippedCount.toString(),
+            rightLabel = "Missed",
+            rightValue = summary.missedCount.toString()
+        )
+
+        if (summary.snoozedCount > 0 || !summary.nextDoseLabel.isNullOrBlank()) {
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        if (pendingDoseVerification != null) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+        if (summary.snoozedCount > 0) {
+            StatusChip(label = "Snoozed ${summary.snoozedCount}")
+        }
+
+        if (!summary.nextDoseLabel.isNullOrBlank()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            InfoCard(
+                title = "Next dose",
+                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                contentColor = MaterialTheme.colorScheme.primary
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "Live Photo Check",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "Compare the saved medicine photo with the live photo you just captured, then confirm.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "Use the real bottle, blister pack, or pill in the live camera photo. Gallery photos are not used here.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = pendingDoseVerification.matchMessage,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (pendingDoseVerification.isLikelyMatch) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.error
-                        }
-                    )
-
-                    Text(
-                        text = "Similarity check: ${pendingDoseVerification.similarityScore}%",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
+                Text(
+                    text = summary.nextDoseLabel,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
             }
+        }
+    }
+}
 
-            Spacer(modifier = Modifier.height(20.dp))
+@Composable
+private fun SummaryStatRow(
+    leftLabel: String,
+    leftValue: String,
+    rightLabel: String,
+    rightValue: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        SummaryStatCard(
+            label = leftLabel,
+            value = leftValue,
+            modifier = Modifier.weight(1f)
+        )
+        SummaryStatCard(
+            label = rightLabel,
+            value = rightValue,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "Confirm Taken Dose",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+@Composable
+private fun SummaryStatCard(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.background
+        )
+    ) {
+        androidx.compose.foundation.layout.Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "${pendingDoseVerification.medicationName} at ${pendingDoseVerification.scheduledTime}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Text(
-                        text = "Expected medicine",
-                        style = MaterialTheme.typography.titleSmall
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    VerificationImagePreview(imageUri = pendingDoseVerification.referenceImageUri)
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Text(
-                        text = "Live photo now",
-                        style = MaterialTheme.typography.titleSmall
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    VerificationImagePreview(imageUri = pendingDoseVerification.capturedImageUri)
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Text(
-                        text = if (pendingDoseVerification.isLikelyMatch) {
-                            "This looks close enough to the saved reference."
-                        } else {
-                            "This does not look close enough to the saved reference yet."
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (pendingDoseVerification.isLikelyMatch) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.error
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Button(
-                        onClick = onConfirmTaken,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = pendingDoseVerification.isLikelyMatch
-                    ) {
-                        Text(text = "Confirm Taken")
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    OutlinedButton(
-                        onClick = onRetakeTakenPhoto,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(text = "Retake Photo")
-                    }
-                }
+@Composable
+private fun VerificationStatusCard(
+    verification: PendingDoseVerificationDisplay
+) {
+    InfoCard(
+        title = "Live Photo Check"
+    ) {
+        Text(
+            text = "The app is checking whether the live photo looks close to the saved medicine reference.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSecondaryContainer
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = verification.matchMessage,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (verification.isLikelyMatch) {
+                MaterialTheme.colorScheme.onSecondaryContainer
+            } else {
+                MaterialTheme.colorScheme.error
             }
-        } else if (statusMessage.isNotBlank()) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "Similarity: ${verification.similarityScore}%",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSecondaryContainer
+        )
+    }
+}
+
+@Composable
+private fun VerificationCompareCard(
+    verification: PendingDoseVerificationDisplay,
+    onConfirmTaken: () -> Unit,
+    onRetakeTakenPhoto: () -> Unit
+) {
+    SurfaceCard {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconBadge(
+                icon = Icons.Outlined.CameraAlt,
+                size = 44
+            )
+            Column {
+                Text(
+                    text = "Confirm taken dose",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
                 )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "Dose Update",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = statusMessage,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
+                Text(
+                    text = "${verification.medicationName} at ${verification.scheduledTime}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Text(
+            text = if (verification.isLikelyMatch) {
+                "The images look close enough. You can confirm this dose."
+            } else {
+                "The images do not look close enough yet. Retake the live photo."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (verification.isLikelyMatch) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.error
+            }
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        SectionLabel(text = "Expected medicine")
+        Spacer(modifier = Modifier.height(8.dp))
+        VerificationImagePreview(imageUri = verification.referenceImageUri)
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        SectionLabel(text = "Live photo now")
+        Spacer(modifier = Modifier.height(8.dp))
+        VerificationImagePreview(imageUri = verification.capturedImageUri)
+
+        Spacer(modifier = Modifier.height(12.dp))
 
         Button(
-            onClick = onBackClick,
+            onClick = onConfirmTaken,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = verification.isLikelyMatch
+        ) {
+            Text(text = "Confirm Taken")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedButton(
+            onClick = onRetakeTakenPhoto,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(text = "Back To Home")
+            Text(text = "Retake Photo")
         }
+    }
+}
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Text(
-            text = "Remaining Today",
-            style = MaterialTheme.typography.titleMedium
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        if (dueDoses.isEmpty()) {
-            Text(
-                text = "No more scheduled doses for today.",
-                style = MaterialTheme.typography.bodyMedium
+@Composable
+private fun DueDoseCard(
+    dose: DoseLoggingItem,
+    onTakeDosePhoto: () -> Unit,
+    onSkip: () -> Unit,
+    onSnooze: () -> Unit
+) {
+    SurfaceCard {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconBadge(
+                icon = Icons.Outlined.Schedule,
+                size = 44
             )
-        } else {
-            dueDoses.forEach { dose ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Text(
-                            text = dose.medicationName,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            text = "Scheduled: ${dose.scheduledTime}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = "Frequency: ${dose.frequencyLabel}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        if (dose.availabilityMessage.isNotBlank()) {
-                            Text(
-                                text = "Status: ${dose.availabilityMessage}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        if (!dose.todayStatusLabel.isNullOrBlank()) {
-                            Text(
-                                text = "Today: ${dose.todayStatusLabel}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Button(
-                            onClick = { onTakeDosePhoto(dose) },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = dose.isActionAllowed
-                        ) {
-                            Text(
-                                text = "Take Live Photo To Confirm"
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        OutlinedButton(
-                            onClick = { onLogDose(dose, DoseStatus.SKIPPED) },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = dose.isActionAllowed
-                        ) {
-                            Text(text = "Skipped")
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        OutlinedButton(
-                            onClick = { onLogDose(dose, DoseStatus.SNOOZED) },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = dose.isActionAllowed
-                        ) {
-                            Text(text = "Snoozed")
-                        }
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Text(
-            text = "Logged Today",
-            style = MaterialTheme.typography.titleMedium
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        if (todayLoggedDoses.isEmpty()) {
-            Text(
-                text = "Nothing has been logged yet today.",
-                style = MaterialTheme.typography.bodyMedium
-            )
-        } else {
-            loggedTodaySections.forEach { section ->
+            Column {
                 Text(
-                    text = "${section.title} (${section.logs.size})",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary
+                    text = dose.medicationName,
+                    style = MaterialTheme.typography.titleMedium
                 )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                buildGroupedDoseLogItems(section.logs).forEach { item ->
-                    GroupedDoseLogCard(item = item)
-                }
+                Text(
+                    text = "Scheduled ${dose.scheduledTime}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Text(
-            text = "History",
-            style = MaterialTheme.typography.titleMedium
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            LogHistoryRange.entries.forEach { range ->
-                val isSelected = range == selectedHistoryRange
-                if (isSelected) {
-                    Button(
-                        onClick = { selectedHistoryRange = range },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(text = range.label)
-                    }
-                } else {
-                    OutlinedButton(
-                        onClick = { selectedHistoryRange = range },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(text = range.label)
-                    }
-                }
+            StatusChip(label = dose.frequencyLabel)
+            if (dose.availabilityMessage.isNotBlank()) {
+                StatusChip(label = dose.availabilityMessage)
+            }
+            if (!dose.todayStatusLabel.isNullOrBlank()) {
+                StatusChip(label = dose.todayStatusLabel)
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        if (filteredRecentLogs.isEmpty()) {
-            Text(
-                text = "No dose logs in ${selectedHistoryRange.label.lowercase()} yet.",
-                style = MaterialTheme.typography.bodyMedium
+        Button(
+            onClick = onTakeDosePhoto,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = dose.isActionAllowed
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.CameraAlt,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
             )
-        } else {
-            historyDateSections.forEach { section ->
+            Spacer(modifier = Modifier.size(8.dp))
+            Text(text = "Take Live Photo To Confirm")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedButton(
+            onClick = onSkip,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = dose.isActionAllowed
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.WarningAmber,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.size(8.dp))
+            Text(text = "Skipped")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedButton(
+            onClick = onSnooze,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = dose.isActionAllowed
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.NotificationsPaused,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.size(8.dp))
+            Text(text = "Snoozed")
+        }
+    }
+}
+
+@Composable
+private fun EmptyDoseStateCard(
+    title: String,
+    message: String
+) {
+    SurfaceCard {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconBadge(
+                icon = Icons.Outlined.CheckCircle,
+                size = 44
+            )
+            Column {
                 Text(
-                    text = section.title,
-                    style = MaterialTheme.typography.titleSmall,
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                section.items.forEach { item ->
-                    GroupedDoseLogCard(item = item)
-                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -600,124 +706,72 @@ private fun DoseLoggingScreenPreview() {
 }
 
 @Composable
-private fun DoseLogCard(
-    log: DoseLogDisplayItem
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = log.medicationName,
-                    style = MaterialTheme.typography.titleSmall
-                )
-                Text(
-                    text = "Scheduled: ${log.scheduledTime}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Text(
-                    text = "Date: ${formatHistoryDate(log.logDate)}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                if (!log.takenAt.isNullOrBlank()) {
-                    Text(
-                        text = "Recorded: ${log.takenAt}",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-                if (log.hasVerificationPhoto) {
-                    Text(
-                        text = "Verification photo saved",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-
-                    if (!log.imageUri.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        VerificationImagePreview(
-                            imageUri = log.imageUri,
-                            size = 72.dp
-                        )
-                    }
-                }
-            }
-
-            Text(
-                text = log.status.name.lowercase().replaceFirstChar { it.uppercase() },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-    }
-}
-
-@Composable
 private fun GroupedDoseLogCard(
     item: GroupedDoseLogItem
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
+    SurfaceCard {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = item.medicationName,
-                style = MaterialTheme.typography.titleSmall
+            IconBadge(
+                icon = when {
+                    item.statusSummary.contains("Taken") -> Icons.Outlined.CheckCircle
+                    item.statusSummary.contains("Missed") -> Icons.Outlined.WarningAmber
+                    else -> Icons.Outlined.History
+                },
+                size = 42
             )
-            Text(
-                text = "Times: ${item.scheduledTimes.joinToString(", ")}",
-                style = MaterialTheme.typography.bodySmall
+            Column {
+                Text(
+                    text = item.medicationName,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = "Times: ${item.scheduledTimes.joinToString(", ")}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            StatusChip(label = formatHistoryDate(item.logDate))
+            StatusChip(
+                label = item.statusSummary,
+                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                contentColor = MaterialTheme.colorScheme.primary
             )
-            Text(
-                text = "Date: ${formatHistoryDate(item.logDate)}",
-                style = MaterialTheme.typography.bodySmall
-            )
-            Text(
-                text = item.statusSummary,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary
-            )
+        }
+
+        if (item.takenAtEntries.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(10.dp))
             item.takenAtEntries.forEach { entry ->
                 Text(
                     text = "Recorded: $entry",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
-            if (item.hasVerificationPhoto) {
-                Text(
-                    text = "Verification photo saved",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
+        }
 
-                if (!item.imageUri.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    VerificationImagePreview(
-                        imageUri = item.imageUri,
-                        size = 72.dp
-                    )
-                }
+        if (item.hasVerificationPhoto) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Verification photo saved",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            if (!item.imageUri.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                VerificationImagePreview(
+                    imageUri = item.imageUri,
+                    size = 72.dp
+                )
             }
         }
     }
@@ -727,7 +781,7 @@ private fun GroupedDoseLogCard(
 private fun VerificationImagePreview(
     imageUri: String,
     modifier: Modifier = Modifier,
-    size: androidx.compose.ui.unit.Dp = 120.dp
+    size: Dp = 120.dp
 ) {
     val context = LocalContext.current
     val bitmap = remember(imageUri) {
@@ -739,17 +793,53 @@ private fun VerificationImagePreview(
     }
 
     if (bitmap != null) {
-        Image(
-            bitmap = bitmap.asImageBitmap(),
-            contentDescription = "Dose verification photo",
+        OutlinedCard(
+            shape = RoundedCornerShape(14.dp),
             modifier = modifier
-                .size(size)
-                .clip(RoundedCornerShape(12.dp))
-        )
+        ) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = "Dose verification photo",
+                modifier = Modifier
+                    .size(size)
+                    .clip(RoundedCornerShape(12.dp))
+            )
+        }
     } else {
         Text(
             text = "Photo preview unavailable",
             style = MaterialTheme.typography.bodySmall
+        )
+    }
+}
+
+@Composable
+private fun StatusSectionHeader(
+    title: String,
+    count: Int
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconBadge(
+            icon = when (title) {
+                "Taken" -> Icons.Outlined.CheckCircle
+                "Missed" -> Icons.Outlined.WarningAmber
+                "Skipped" -> Icons.Outlined.LocalHospital
+                else -> Icons.Outlined.NotificationsPaused
+            },
+            size = 34
+        )
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary
+        )
+        StatusChip(
+            label = count.toString(),
+            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+            contentColor = MaterialTheme.colorScheme.primary
         )
     }
 }
@@ -787,13 +877,13 @@ private fun filterDoseLogsForRange(
     val today = Calendar.getInstance()
     return logs
         .filter { log ->
-        val calendar = parseLogDate(log.logDate) ?: return@filter false
-        when (range) {
-            LogHistoryRange.TODAY -> sameDay(calendar, today)
-            LogHistoryRange.WEEK -> sameWeek(calendar, today)
-            LogHistoryRange.MONTH -> sameMonth(calendar, today)
+            val calendar = parseLogDate(log.logDate) ?: return@filter false
+            when (range) {
+                LogHistoryRange.TODAY -> sameDay(calendar, today)
+                LogHistoryRange.WEEK -> sameWeek(calendar, today)
+                LogHistoryRange.MONTH -> sameMonth(calendar, today)
+            }
         }
-    }
         .sortedWith(doseLogDisplayComparator())
 }
 
@@ -819,23 +909,6 @@ private fun buildStatusSections(
             )
         }
     }
-}
-
-private fun buildDateSections(
-    logs: List<DoseLogDisplayItem>
-): List<DoseLogSection> {
-    return logs
-        .groupBy { it.logDate }
-        .toList()
-        .sortedByDescending { (date, _) ->
-            parseLogDate(date)?.timeInMillis ?: Long.MIN_VALUE
-        }
-        .map { (date, dateLogs) ->
-            DoseLogSection(
-                title = formatFullDateHeader(date),
-                logs = dateLogs.sortedWith(doseLogDisplayComparator())
-            )
-        }
 }
 
 private fun buildGroupedDateSections(
@@ -899,7 +972,7 @@ private fun buildStatusSummary(
 
     return counts.mapNotNull { (status, count) ->
         if (count == 0) null else "${statusSectionTitle(status)} $count"
-    }.joinToString(" • ")
+    }.joinToString(" | ")
 }
 
 private fun firstTimeMinutes(times: List<String>): Int? {

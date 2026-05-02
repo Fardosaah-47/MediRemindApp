@@ -1,28 +1,55 @@
 package com.example.mediremind.ui.screen.home
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Assignment
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.LocalPharmacy
+import androidx.compose.material.icons.outlined.MedicalServices
+import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.mediremind.ui.theme.MediRemindTheme
 
 @Composable
@@ -42,270 +69,488 @@ fun HomeScreen(
     onStartPatientReportFlow: () -> Unit = {},
     onStartCaregiverScanFlow: () -> Unit = {}
 ) {
-    Column(
+    val adherenceProgress =
+        if (dueTodayCount > 0) loggedTodayCount.toFloat() / dueTodayCount else 0f
+
+    LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .background(MaterialTheme.colorScheme.background)
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Top,
-        horizontalAlignment = Alignment.Start
+            .background(MaterialTheme.colorScheme.background),
+        contentPadding = PaddingValues(bottom = 32.dp)
     ) {
-        Text(
-            text = "MediRemind",
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.primary
-        )
+        item {
+            HomeHeroHeader(patientName = patientName)
+        }
 
-        if (!patientName.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(8.dp))
+        item {
+            Spacer(modifier = Modifier.height(20.dp))
+            StatsRow(
+                medicationCount = medicationCount,
+                scheduleCount = scheduleCount,
+                dueTodayCount = dueTodayCount,
+                loggedTodayCount = loggedTodayCount,
+                modifier = Modifier.padding(horizontal = 20.dp)
+            )
+        }
+
+        if (dueTodayCount > 0) {
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+                AdherenceCard(
+                    logged = loggedTodayCount,
+                    total = dueTodayCount,
+                    progress = adherenceProgress,
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+            NextStepCard(
+                message = nextStepLabel,
+                modifier = Modifier.padding(horizontal = 20.dp)
+            )
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "Patient: $patientName",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
+                text = "Quick Actions",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.padding(horizontal = 20.dp)
             )
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Text(
-            text = "Offline medication support for patients, caregivers, and daily dose tracking.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
-        ) {
+        item {
             Column(
-                modifier = Modifier.padding(20.dp)
+                modifier = Modifier.padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = "Today at a glance",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ActionCard(
+                        label = "Profile",
+                        icon = Icons.Outlined.AccountCircle,
+                        onClick = onStartProfileFlow,
+                        modifier = Modifier.weight(1f)
+                    )
+                    ActionCard(
+                        label = "Medications",
+                        icon = Icons.Outlined.LocalPharmacy,
+                        onClick = onStartMedicationFlow,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ActionCard(
+                        label = "Schedules",
+                        icon = Icons.Outlined.CalendarToday,
+                        onClick = onStartScheduleFlow,
+                        modifier = Modifier.weight(1f)
+                    )
+                    ActionCard(
+                        label = "Dose Log",
+                        icon = Icons.Outlined.CheckCircle,
+                        onClick = onStartDoseLoggingFlow,
+                        modifier = Modifier.weight(1f),
+                        highlight = dueTodayCount > loggedTodayCount
+                    )
+                }
 
-                DashboardStatRow(
-                    leftLabel = "Medications",
-                    leftValue = medicationCount.toString(),
-                    rightLabel = "Schedules",
-                    rightValue = scheduleCount.toString()
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                DashboardStatRow(
-                    leftLabel = "Due Today",
-                    leftValue = dueTodayCount.toString(),
-                    rightLabel = "Logged Today",
-                    rightValue = loggedTodayCount.toString()
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ActionCard(
+                        label = "Import QR",
+                        icon = Icons.Outlined.QrCodeScanner,
+                        onClick = onStartQrImportFlow,
+                        modifier = Modifier.weight(1f)
+                    )
+                    ActionCard(
+                        label = "Patient Report",
+                        icon = Icons.Outlined.Assignment,
+                        onClick = onStartPatientReportFlow,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
+        item {
+            Spacer(modifier = Modifier.height(12.dp))
+            CaregiverScanCta(
+                onClick = onStartCaregiverScanFlow,
+                modifier = Modifier.padding(horizontal = 20.dp)
             )
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp)
-            ) {
-                Text(
-                    text = "Next best step",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Text(
-                    text = nextStepLabel,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp)
-            ) {
-                Text(
-                    text = "Core flow",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "1. Save the patient profile and medication list.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    text = "2. Set the schedule and verify real doses with a live photo.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    text = "3. Review history, refill status, and caregiver reports.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Text(
-            text = "Quick actions",
-            style = MaterialTheme.typography.titleMedium
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        HomeActionButton(
-            label = "Patient Profile",
-            onClick = onStartProfileFlow
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        HomeActionButton(
-            label = "Medication Setup",
-            onClick = onStartMedicationFlow
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        HomeActionButton(
-            label = "Schedule Setup",
-            onClick = onStartScheduleFlow
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        HomeActionButton(
-            label = "Dose Logging",
-            onClick = onStartDoseLoggingFlow
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        HomeActionButton(
-            label = "Import By QR",
-            onClick = onStartQrImportFlow
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        HomeActionButton(
-            label = "Patient Report",
-            onClick = onStartPatientReportFlow
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        HomeActionButton(
-            label = "Caregiver Scan",
-            onClick = onStartCaregiverScanFlow
-        )
     }
 }
 
 @Composable
-private fun DashboardStatRow(
-    leftLabel: String,
-    leftValue: String,
-    rightLabel: String,
-    rightValue: String
+private fun HomeHeroHeader(patientName: String?) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.primary)
+            .padding(start = 24.dp, end = 24.dp, top = 48.dp, bottom = 32.dp)
+    ) {
+        Column {
+            Surface(
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.18f),
+                shape = RoundedCornerShape(50)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.MedicalServices,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "MediRemind",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            if (!patientName.isNullOrBlank()) {
+                Text(
+                    text = "Hello,",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.75f)
+                    )
+                )
+                Text(
+                    text = patientName,
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            } else {
+                Text(
+                    text = "Set up patient",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = if (!patientName.isNullOrBlank()) {
+                    "Today's medication progress and caregiver support."
+                } else {
+                    "Save the patient profile first so the app can personalize reminders and reports."
+                },
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatsRow(
+    medicationCount: Int,
+    scheduleCount: Int,
+    dueTodayCount: Int,
+    loggedTodayCount: Int,
+    modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        DashboardStatCard(
-            modifier = Modifier.weight(1f),
-            label = leftLabel,
-            value = leftValue
+        StatChip(
+            label = "Meds",
+            value = medicationCount.toString(),
+            modifier = Modifier.weight(1f)
         )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        DashboardStatCard(
-            modifier = Modifier.weight(1f),
-            label = rightLabel,
-            value = rightValue
+        StatChip(
+            label = "Schedules",
+            value = scheduleCount.toString(),
+            modifier = Modifier.weight(1f)
+        )
+        StatChip(
+            label = "Due",
+            value = dueTodayCount.toString(),
+            modifier = Modifier.weight(1f)
+        )
+        StatChip(
+            label = "Logged",
+            value = loggedTodayCount.toString(),
+            modifier = Modifier.weight(1f)
         )
     }
 }
 
 @Composable
-private fun DashboardStatCard(
-    modifier: Modifier = Modifier,
+private fun StatChip(
     label: String,
-    value: String
+    value: String,
+    modifier: Modifier = Modifier
 ) {
-    Card(
+    ElevatedCard(
         modifier = modifier,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.background
-        ),
-        shape = RoundedCornerShape(20.dp)
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 14.dp, horizontal = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 text = value,
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp
+                ),
                 color = MaterialTheme.colorScheme.primary
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = label,
-                style = MaterialTheme.typography.bodySmall
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
 }
 
 @Composable
-private fun HomeActionButton(
-    label: String,
-    onClick: () -> Unit
+private fun AdherenceCard(
+    logged: Int,
+    total: Int,
+    progress: Float,
+    modifier: Modifier = Modifier
 ) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth()
+    val progressColor by animateColorAsState(
+        targetValue = when {
+            progress >= 1f -> Color(0xFF2E7D32)
+            progress >= 0.5f -> MaterialTheme.colorScheme.primary
+            else -> MaterialTheme.colorScheme.tertiary
+        },
+        animationSpec = tween(600),
+        label = "progressColor"
+    )
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Text(text = label)
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Today's Adherence",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "$logged / $total doses",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            LinearProgressIndicator(
+                progress = { progress.coerceIn(0f, 1f) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(50)),
+                color = progressColor,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                strokeCap = StrokeCap.Round
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = when {
+                    progress >= 1f -> "All doses logged for today. Great job."
+                    logged == 0 -> "No doses logged yet today."
+                    else -> "${total - logged} dose(s) remaining today."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
-@Preview(showBackground = true)
+@Composable
+private fun NextStepCard(
+    message: String,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.25f),
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = ">",
+                    fontSize = 18.sp,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+            Column {
+                Text(
+                    text = "Next Best Step",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium),
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActionCard(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    highlight: Boolean = false
+) {
+    val containerColor = if (highlight) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+
+    val contentColor = if (highlight) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+
+    ElevatedCard(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (highlight) 3.dp else 1.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = containerColor)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 18.dp, horizontal = 14.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = if (highlight) 0.18f else 0.1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = contentColor,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun CaregiverScanCta(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        contentPadding = PaddingValues(vertical = 16.dp, horizontal = 20.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.tertiary,
+            contentColor = MaterialTheme.colorScheme.onTertiary
+        )
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.CameraAlt,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = "Caregiver Scan",
+            style = MaterialTheme.typography.labelLarge
+        )
+    }
+}
+
+@Preview(showBackground = true, showSystemUi = true)
 @Composable
 private fun HomeScreenPreview() {
     MediRemindTheme {
-        HomeScreen()
+        HomeScreen(
+            patientName = "Mary Achieng",
+            medicationCount = 3,
+            scheduleCount = 2,
+            dueTodayCount = 4,
+            loggedTodayCount = 2,
+            nextStepLabel = "You have 2 doses remaining today. Tap Dose Log to record them."
+        )
     }
 }
