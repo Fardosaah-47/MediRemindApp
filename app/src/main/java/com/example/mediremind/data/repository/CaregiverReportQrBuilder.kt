@@ -41,6 +41,14 @@ object CaregiverReportQrBuilder {
     private const val MAX_QR_PAYLOAD_CHARACTERS = 2400
     private const val MAX_QR_MEDICATION_NAME_CHARACTERS = 40
 
+    private fun sevenDaysAgo(): String {
+        val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val calendar = java.util.Calendar.getInstance().apply {
+            add(java.util.Calendar.DAY_OF_YEAR, -6)
+        }
+        return formatter.format(calendar.time)
+    }
+
     fun buildSummary(
         userProfile: UserProfile?,
         medications: List<Medication>,
@@ -49,11 +57,15 @@ object CaregiverReportQrBuilder {
         val patientName = userProfile?.fullName?.takeIf { it.isNotBlank() } ?: "Patient Not Set"
         val caregiverName = userProfile?.caregiverName?.takeIf { it.isNotBlank() }
         val reportDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-        val totalTaken = doseLogs.count { it.status == DoseStatus.TAKEN }
-        val totalSkipped = doseLogs.count { it.status == DoseStatus.SKIPPED }
-        val totalSnoozed = doseLogs.count { it.status == DoseStatus.SNOOZED }
-        val totalMissed = doseLogs.count { it.status == DoseStatus.MISSED }
-        val totalLogged = doseLogs.size
+        val weekStartDate = sevenDaysAgo()
+        val reportDoseLogs = doseLogs.filter { log ->
+            log.logDate >= weekStartDate && log.logDate <= reportDate
+        }
+        val totalTaken = reportDoseLogs.count { it.status == DoseStatus.TAKEN }
+        val totalSkipped = reportDoseLogs.count { it.status == DoseStatus.SKIPPED }
+        val totalSnoozed = reportDoseLogs.count { it.status == DoseStatus.SNOOZED }
+        val totalMissed = reportDoseLogs.count { it.status == DoseStatus.MISSED }
+        val totalLogged = reportDoseLogs.size
         val adherenceRate = if (totalLogged > 0) {
             ((totalTaken.toDouble() / totalLogged.toDouble()) * 100).toInt()
         } else {
@@ -63,7 +75,7 @@ object CaregiverReportQrBuilder {
         val medicationNameById = medications.associate { medication ->
             medication.id to medication.name.trim()
         }
-        val medicationSummaries = doseLogs
+        val medicationSummaries = reportDoseLogs
             .groupBy { log ->
                 medicationNameById[log.medicationId]
                     ?.takeIf { it.isNotBlank() }

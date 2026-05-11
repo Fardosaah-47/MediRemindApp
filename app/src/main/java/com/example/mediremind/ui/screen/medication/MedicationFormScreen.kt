@@ -25,6 +25,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -43,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.mediremind.data.model.DoseFrequency
 import com.example.mediremind.data.model.Medication
 import com.example.mediremind.data.model.MedicationForm
 import com.example.mediremind.ui.components.MediRemindTopBar
@@ -50,6 +55,7 @@ import com.example.mediremind.ui.components.SectionLabel
 import com.example.mediremind.ui.components.SurfaceCard
 import com.example.mediremind.ui.theme.MediRemindTheme
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MedicationFormScreen(
     modifier: Modifier = Modifier,
@@ -68,6 +74,12 @@ fun MedicationFormScreen(
     }
     val dosage = remember(existingMedication?.id) {
         mutableStateOf(existingMedication?.dosage.orEmpty())
+    }
+    val selectedFrequency = remember(existingMedication?.id) {
+        mutableStateOf(inferFrequencyFromDosage(existingMedication?.dosage.orEmpty()))
+    }
+    val frequencyMenuExpanded = remember(existingMedication?.id) {
+        mutableStateOf(false)
     }
     val stockAmount = remember(existingMedication?.id) {
         mutableStateOf(existingMedication?.currentStockAmount?.toString().orEmpty())
@@ -209,6 +221,61 @@ fun MedicationFormScreen(
             }
 
             item {
+                SectionLabel(text = "DOSING FREQUENCY")
+                Spacer(modifier = Modifier.height(8.dp))
+                SurfaceCard {
+                    ExposedDropdownMenuBox(
+                        expanded = frequencyMenuExpanded.value && !areProtectedQrFieldsReadOnly,
+                        onExpandedChange = {
+                            if (!areProtectedQrFieldsReadOnly) {
+                                frequencyMenuExpanded.value = it
+                            }
+                        }
+                    ) {
+                        OutlinedTextField(
+                            value = selectedFrequency.value?.displayLabel() ?: "Choose how often",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("How often is this taken?") },
+                            trailingIcon = {
+                                if (areProtectedQrFieldsReadOnly) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Lock,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.outline,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                } else {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(
+                                        expanded = frequencyMenuExpanded.value
+                                    )
+                                }
+                            },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        ExposedDropdownMenu(
+                            expanded = frequencyMenuExpanded.value && !areProtectedQrFieldsReadOnly,
+                            onDismissRequest = { frequencyMenuExpanded.value = false }
+                        ) {
+                            DoseFrequency.entries.forEach { frequency ->
+                                DropdownMenuItem(
+                                    text = { Text(frequency.displayLabel()) },
+                                    onClick = {
+                                        selectedFrequency.value = frequency
+                                        frequencyMenuExpanded.value = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
                 SectionLabel(text = "STOCK & REFILL")
                 Spacer(modifier = Modifier.height(8.dp))
                 SurfaceCard {
@@ -278,12 +345,16 @@ fun MedicationFormScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Button(
                         onClick = {
+                            val dosageWithFrequency = buildDosageWithFrequency(
+                                dosageText = dosage.value,
+                                frequency = selectedFrequency.value
+                            )
                             onSaveMedication(
                                 Medication(
                                     id = existingMedication?.id ?: 0,
                                     name = medicationName.value.ifBlank { "Untitled Medication" },
                                     form = parseMedicationForm(medicationForm.value),
-                                    dosage = dosage.value.ifBlank { "Not specified" },
+                                    dosage = dosageWithFrequency,
                                     currentStockAmount = stockAmount.value.toDoubleOrNull() ?: 0.0,
                                     stockUnit = stockUnit.value.ifBlank { "units" },
                                     refillAlertAt = refillAlertAt.value.toDoubleOrNull() ?: 0.0,
@@ -426,6 +497,53 @@ private fun parseMedicationForm(input: String): MedicationForm {
         "liquid", "syrup" -> MedicationForm.LIQUID
         "injection", "injectable" -> MedicationForm.INJECTION
         else -> MedicationForm.OTHER
+    }
+}
+
+private fun buildDosageWithFrequency(
+    dosageText: String,
+    frequency: DoseFrequency?
+): String {
+    val base = dosageText.trim().ifBlank { "Not specified" }
+    val frequencyText = frequency?.dosageText() ?: return base
+    val normalizedBase = base.lowercase()
+
+    return if (frequencyText in normalizedBase || frequency.name.lowercase() in normalizedBase) {
+        base
+    } else {
+        "$base, $frequencyText"
+    }
+}
+
+private fun inferFrequencyFromDosage(dosage: String): DoseFrequency? {
+    val normalized = dosage.lowercase()
+    return when {
+        "three times daily" in normalized || "3 times daily" in normalized || "three_times_daily" in normalized -> DoseFrequency.THREE_TIMES_DAILY
+        "twice daily" in normalized || "2 times daily" in normalized || "twice_daily" in normalized -> DoseFrequency.TWICE_DAILY
+        "once daily" in normalized || "once_daily" in normalized || "daily" in normalized -> DoseFrequency.ONCE_DAILY
+        "weekly" in normalized -> DoseFrequency.WEEKLY
+        "as needed" in normalized || "as_needed" in normalized || "when needed" in normalized -> DoseFrequency.AS_NEEDED
+        else -> null
+    }
+}
+
+private fun DoseFrequency.displayLabel(): String {
+    return when (this) {
+        DoseFrequency.ONCE_DAILY -> "Once daily"
+        DoseFrequency.TWICE_DAILY -> "Twice daily"
+        DoseFrequency.THREE_TIMES_DAILY -> "Three times daily"
+        DoseFrequency.WEEKLY -> "Once a week"
+        DoseFrequency.AS_NEEDED -> "As needed"
+    }
+}
+
+private fun DoseFrequency.dosageText(): String {
+    return when (this) {
+        DoseFrequency.ONCE_DAILY -> "once daily"
+        DoseFrequency.TWICE_DAILY -> "twice daily"
+        DoseFrequency.THREE_TIMES_DAILY -> "three times daily"
+        DoseFrequency.WEEKLY -> "weekly"
+        DoseFrequency.AS_NEEDED -> "as needed"
     }
 }
 
