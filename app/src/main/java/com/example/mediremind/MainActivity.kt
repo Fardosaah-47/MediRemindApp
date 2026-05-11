@@ -1323,9 +1323,28 @@ private suspend fun syncMedicationSchedulesFromMedicationDetails(
 ) {
     val inferredFrequency = inferDoseFrequencyFromDosageText(medication.dosage) ?: return
     val existingSchedules = doseScheduleRepository.getSchedulesForMedication(medication.id)
-    if (existingSchedules.isEmpty()) return
-
     val todayDate = currentDateOnly()
+
+    if (existingSchedules.isEmpty()) {
+        val startDate = todayDate
+        val endDate = calculateEndDateFromMedication(
+            medication = medication,
+            frequency = inferredFrequency,
+            startDate = startDate
+        )
+        val newSchedules = defaultReminderTimesForFrequency(inferredFrequency).map { time ->
+            DoseSchedule(
+                medicationId = medication.id,
+                time = time,
+                frequency = inferredFrequency,
+                startDate = startDate,
+                endDate = endDate
+            )
+        }
+        doseScheduleRepository.insertDoseSchedules(newSchedules)
+        return
+    }
+
     val activeSchedules = existingSchedules.filter { schedule ->
         schedule.endDate.isBlank() || isScheduleActiveOnOrAfterToday(
             schedule = schedule,
@@ -1554,7 +1573,7 @@ private suspend fun importQrPayload(
     doseScheduleRepository: DoseScheduleRepository
 ): QrImportResult {
     val payload = QrImportParser.parse(rawValue)
-    val startDate = plusDays(currentDateOnly(), 1)
+    val startDate = currentDateOnly()
     val defaultEndDate = plusDays(startDate, 29)
     val insertedMedicationIds = mutableListOf<Long>()
     var autoScheduledCount = 0
