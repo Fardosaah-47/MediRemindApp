@@ -722,7 +722,7 @@ private fun AppContent(
                 isScheduleActiveOnDate(schedule, todayDate)
             }
             val loggedTodayCount = doseLogs.count { log ->
-                log.logDate == todayDate
+                log.logDate == todayDate && log.status != DoseStatus.MISSED
             }
             val nextStepLabel = when {
                 userProfile == null -> "Save the patient profile first so reports and caregiver sharing use the right patient name."
@@ -989,7 +989,7 @@ private fun evaluateDoseAvailability(
         it.get(Calendar.HOUR_OF_DAY) * 60 + it.get(Calendar.MINUTE)
     }
     val minutesDifference = currentMinutes - scheduleMinutes
-    val earlyWindowMinutes = 0
+    val earlyWindowMinutes = 30
     val lateWindowMinutes = 60
 
     return when {

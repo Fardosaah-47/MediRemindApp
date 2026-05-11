@@ -76,7 +76,7 @@ fun DoseScheduleFormScreen(
         mutableStateOf(existingSchedule?.startDate ?: addDaysToDate(todayDateOnly(), 1))
     }
     val endDate = remember(existingSchedule?.id) {
-        mutableStateOf(existingSchedule?.endDate ?: addDaysToDate(todayDateOnly(), 13))
+        mutableStateOf(existingSchedule?.endDate ?: addDaysToDate(todayDateOnly(), 29))
     }
     val medicationMenuExpanded = remember { mutableStateOf(false) }
     val context = LocalContext.current

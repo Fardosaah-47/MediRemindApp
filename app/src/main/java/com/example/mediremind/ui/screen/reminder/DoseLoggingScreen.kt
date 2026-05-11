@@ -291,17 +291,13 @@ fun DoseLoggingScreen(
                     )
                 }
             } else if (selectedHistoryRange == LogHistoryRange.TODAY) {
-                historyDateSections.forEach { section ->
-                    item {
+                item {
+                    InfoCard(title = "Today's activity") {
                         Text(
-                            text = section.title,
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary
+                            text = "Today's doses are already shown in Logged today above. Choose Week or Month to review older history.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
-                    }
-
-                    items(section.items) { item ->
-                        GroupedDoseLogCard(item = item)
                     }
                 }
             } else {
@@ -807,7 +803,7 @@ private fun DueDoseCard(
                 modifier = Modifier.size(18.dp)
             )
             Spacer(modifier = Modifier.size(8.dp))
-            Text(text = "Skipped")
+            Text(text = "Skip this dose")
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -823,7 +819,7 @@ private fun DueDoseCard(
                 modifier = Modifier.size(18.dp)
             )
             Spacer(modifier = Modifier.size(8.dp))
-            Text(text = "Snoozed")
+            Text(text = "Snooze for later")
         }
     }
 }
