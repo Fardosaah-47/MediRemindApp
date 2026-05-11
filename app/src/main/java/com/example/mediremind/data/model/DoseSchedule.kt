@@ -15,11 +15,12 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index(value = ["medicationId"])]
+    indices = [Index(value = ["medicationId"]), Index(value = ["patientId"])]
 )
 data class DoseSchedule(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
+    val patientId: Long = 1,
     val medicationId: Long,
     val time: String,
     val frequency: DoseFrequency,

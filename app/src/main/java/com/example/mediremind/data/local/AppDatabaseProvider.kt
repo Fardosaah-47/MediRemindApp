@@ -44,6 +44,29 @@ object AppDatabaseProvider {
         }
     }
 
+    private val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL(
+                "ALTER TABLE medications ADD COLUMN patientId INTEGER NOT NULL DEFAULT 1"
+            )
+            database.execSQL(
+                "ALTER TABLE dose_schedules ADD COLUMN patientId INTEGER NOT NULL DEFAULT 1"
+            )
+            database.execSQL(
+                "ALTER TABLE dose_logs ADD COLUMN patientId INTEGER NOT NULL DEFAULT 1"
+            )
+            database.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_medications_patientId ON medications(patientId)"
+            )
+            database.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_dose_schedules_patientId ON dose_schedules(patientId)"
+            )
+            database.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_dose_logs_patientId ON dose_logs(patientId)"
+            )
+        }
+    }
+
     fun getDatabase(context: Context): AppDatabase {
         return INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
@@ -55,6 +78,7 @@ object AppDatabaseProvider {
                 .addMigrations(MIGRATION_2_3)
                 .addMigrations(MIGRATION_3_4)
                 .addMigrations(MIGRATION_4_5)
+                .addMigrations(MIGRATION_5_6)
                 .build()
                 .also { INSTANCE = it }
         }
