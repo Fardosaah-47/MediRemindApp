@@ -11,6 +11,10 @@ class MedicationRepository(context: Context) {
         return medicationDao.getAllMedications()
     }
 
+    suspend fun getMedicationById(id: Long): Medication? {
+        return medicationDao.getMedicationById(id)
+    }
+
     suspend fun insertMedication(medication: Medication): Long {
         return medicationDao.insertMedication(medication)
     }

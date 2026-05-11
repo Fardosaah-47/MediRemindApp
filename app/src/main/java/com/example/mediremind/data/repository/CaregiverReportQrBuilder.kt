@@ -38,6 +38,9 @@ data class CaregiverReportSummary(
 )
 
 object CaregiverReportQrBuilder {
+    private const val MAX_QR_PAYLOAD_CHARACTERS = 2400
+    private const val MAX_QR_MEDICATION_NAME_CHARACTERS = 40
+
     fun buildSummary(
         userProfile: UserProfile?,
         medications: List<Medication>,
@@ -78,33 +81,18 @@ object CaregiverReportQrBuilder {
             }
             .sortedBy { it.name.lowercase() }
 
-        val medicationsArray = JSONArray().apply {
-            medicationSummaries.forEach { medicationSummary ->
-                put(
-                    JSONObject()
-                        .put("name", medicationSummary.name)
-                        .put("taken", medicationSummary.taken)
-                        .put("skipped", medicationSummary.skipped)
-                        .put("snoozed", medicationSummary.snoozed)
-                        .put("missed", medicationSummary.missed)
-                        .put("logged", medicationSummary.totalLogged)
-                )
-            }
-        }
-
-        val payload = JSONObject()
-            .put("type", "mediremind_report_v2")
-            .put("patient", patientName)
-            .put("caregiver", caregiverName ?: "")
-            .put("date", reportDate)
-            .put("adherence", adherenceRate)
-            .put("taken", totalTaken)
-            .put("skipped", totalSkipped)
-            .put("snoozed", totalSnoozed)
-            .put("missed", totalMissed)
-            .put("logged", totalLogged)
-            .put("medications", medicationsArray)
-            .toString()
+        val payload = buildQrPayload(
+            patientName = patientName,
+            caregiverName = caregiverName,
+            reportDate = reportDate,
+            adherenceRate = adherenceRate,
+            totalTaken = totalTaken,
+            totalSkipped = totalSkipped,
+            totalSnoozed = totalSnoozed,
+            totalMissed = totalMissed,
+            totalLogged = totalLogged,
+            medicationSummaries = medicationSummaries
+        )
 
         return CaregiverReportSummary(
             patientName = patientName,
@@ -119,6 +107,97 @@ object CaregiverReportQrBuilder {
             medicationSummaries = medicationSummaries,
             qrPayload = payload
         )
+    }
+
+    private fun buildQrPayload(
+        patientName: String,
+        caregiverName: String?,
+        reportDate: String,
+        adherenceRate: Int,
+        totalTaken: Int,
+        totalSkipped: Int,
+        totalSnoozed: Int,
+        totalMissed: Int,
+        totalLogged: Int,
+        medicationSummaries: List<CaregiverMedicationSummary>
+    ): String {
+        var medicationLimit = medicationSummaries.size
+        var payload = buildQrPayloadJson(
+            patientName = patientName,
+            caregiverName = caregiverName,
+            reportDate = reportDate,
+            adherenceRate = adherenceRate,
+            totalTaken = totalTaken,
+            totalSkipped = totalSkipped,
+            totalSnoozed = totalSnoozed,
+            totalMissed = totalMissed,
+            totalLogged = totalLogged,
+            medicationSummaries = medicationSummaries,
+            medicationLimit = medicationLimit
+        )
+
+        while (payload.length > MAX_QR_PAYLOAD_CHARACTERS && medicationLimit > 0) {
+            medicationLimit--
+            payload = buildQrPayloadJson(
+                patientName = patientName,
+                caregiverName = caregiverName,
+                reportDate = reportDate,
+                adherenceRate = adherenceRate,
+                totalTaken = totalTaken,
+                totalSkipped = totalSkipped,
+                totalSnoozed = totalSnoozed,
+                totalMissed = totalMissed,
+                totalLogged = totalLogged,
+                medicationSummaries = medicationSummaries,
+                medicationLimit = medicationLimit
+            )
+        }
+
+        return payload
+    }
+
+    private fun buildQrPayloadJson(
+        patientName: String,
+        caregiverName: String?,
+        reportDate: String,
+        adherenceRate: Int,
+        totalTaken: Int,
+        totalSkipped: Int,
+        totalSnoozed: Int,
+        totalMissed: Int,
+        totalLogged: Int,
+        medicationSummaries: List<CaregiverMedicationSummary>,
+        medicationLimit: Int
+    ): String {
+        val visibleMedicationSummaries = medicationSummaries.take(medicationLimit)
+        val medicationsArray = JSONArray().apply {
+            visibleMedicationSummaries.forEach { medicationSummary ->
+                put(
+                    JSONObject()
+                        .put("name", medicationSummary.name.take(MAX_QR_MEDICATION_NAME_CHARACTERS))
+                        .put("taken", medicationSummary.taken)
+                        .put("skipped", medicationSummary.skipped)
+                        .put("snoozed", medicationSummary.snoozed)
+                        .put("missed", medicationSummary.missed)
+                        .put("logged", medicationSummary.totalLogged)
+                )
+            }
+        }
+
+        return JSONObject()
+            .put("type", "mediremind_report_v2")
+            .put("patient", patientName)
+            .put("caregiver", caregiverName ?: "")
+            .put("date", reportDate)
+            .put("adherence", adherenceRate)
+            .put("taken", totalTaken)
+            .put("skipped", totalSkipped)
+            .put("snoozed", totalSnoozed)
+            .put("missed", totalMissed)
+            .put("logged", totalLogged)
+            .put("medications", medicationsArray)
+            .put("truncated", visibleMedicationSummaries.size < medicationSummaries.size)
+            .toString()
     }
 
     fun parseQrPayload(rawValue: String): CaregiverReportSummary {
@@ -166,8 +245,10 @@ object CaregiverReportQrBuilder {
         )
     }
 
-    fun generateQrBitmap(content: String, size: Int = 900): Bitmap {
-        val bitMatrix = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, size, size)
+    fun generateQrBitmap(content: String, size: Int = 900): Bitmap? {
+        val bitMatrix = runCatching {
+            QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, size, size)
+        }.getOrNull() ?: return null
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
 
         for (x in 0 until size) {

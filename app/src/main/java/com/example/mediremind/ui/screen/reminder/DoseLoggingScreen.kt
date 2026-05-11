@@ -2,7 +2,10 @@ package com.example.mediremind.ui.screen.reminder
 
 import android.graphics.BitmapFactory
 import android.net.Uri
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -28,8 +32,11 @@ import androidx.compose.material.icons.outlined.NotificationsPaused
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
@@ -44,8 +51,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -56,6 +65,8 @@ import com.example.mediremind.ui.components.MediRemindTopBar
 import com.example.mediremind.ui.components.SectionLabel
 import com.example.mediremind.ui.components.StatusChip
 import com.example.mediremind.ui.components.SurfaceCard
+import com.example.mediremind.ui.theme.AlertCoral
+import com.example.mediremind.ui.theme.ClinicTeal
 import com.example.mediremind.ui.theme.MediRemindTheme
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -89,8 +100,10 @@ data class PendingDoseVerificationDisplay(
     val referenceImageUri: String,
     val capturedImageUri: String,
     val isLikelyMatch: Boolean,
+    val isManualOverrideAllowed: Boolean = false,
     val matchMessage: String,
-    val similarityScore: Int
+    val similarityScore: Int,
+    val debugDetail: String = ""
 )
 
 data class TodayDoseSummaryDisplay(
@@ -122,6 +135,7 @@ fun DoseLoggingScreen(
     onBackClick: () -> Unit = {}
 ) {
     var selectedHistoryRange by rememberSaveable { mutableStateOf(LogHistoryRange.WEEK) }
+    var expandedMedicationHistoryKey by rememberSaveable { mutableStateOf<String?>(null) }
     val filteredRecentLogs = remember(recentLogs, selectedHistoryRange) {
         filterDoseLogsForRange(recentLogs, selectedHistoryRange)
     }
@@ -130,6 +144,13 @@ fun DoseLoggingScreen(
     }
     val historyDateSections = remember(filteredRecentLogs) {
         buildGroupedDateSections(filteredRecentLogs)
+    }
+    val medicationHistorySummaries = remember(filteredRecentLogs, selectedHistoryRange) {
+        if (selectedHistoryRange == LogHistoryRange.TODAY) {
+            emptyList()
+        } else {
+            buildMedicationHistorySummaries(filteredRecentLogs)
+        }
     }
 
     androidx.compose.material3.Scaffold(
@@ -239,14 +260,20 @@ fun DoseLoggingScreen(
                         val isSelected = range == selectedHistoryRange
                         if (isSelected) {
                             Button(
-                                onClick = { selectedHistoryRange = range },
+                                onClick = {
+                                    selectedHistoryRange = range
+                                    expandedMedicationHistoryKey = null
+                                },
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Text(text = range.label)
                             }
                         } else {
                             OutlinedButton(
-                                onClick = { selectedHistoryRange = range },
+                                onClick = {
+                                    selectedHistoryRange = range
+                                    expandedMedicationHistoryKey = null
+                                },
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Text(text = range.label)
@@ -263,7 +290,7 @@ fun DoseLoggingScreen(
                         message = "Recent dose activity will appear here once logging starts."
                     )
                 }
-            } else {
+            } else if (selectedHistoryRange == LogHistoryRange.TODAY) {
                 historyDateSections.forEach { section ->
                     item {
                         Text(
@@ -276,6 +303,29 @@ fun DoseLoggingScreen(
                     items(section.items) { item ->
                         GroupedDoseLogCard(item = item)
                     }
+                }
+            } else {
+                item {
+                    Text(
+                        text = "Weekly and monthly history is grouped by medication first. Tap one medicine to see the day-by-day details.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                items(medicationHistorySummaries) { summary ->
+                    MedicationHistorySummaryCard(
+                        summary = summary,
+                        expanded = expandedMedicationHistoryKey == summary.medicationKey,
+                        onToggle = {
+                            expandedMedicationHistoryKey =
+                                if (expandedMedicationHistoryKey == summary.medicationKey) {
+                                    null
+                                } else {
+                                    summary.medicationKey
+                                }
+                        }
+                    )
                 }
             }
         }
@@ -428,6 +478,12 @@ private fun SummaryStatCard(
 private fun VerificationStatusCard(
     verification: PendingDoseVerificationDisplay
 ) {
+    val statusColor = when {
+        verification.isLikelyMatch -> ClinicTeal
+        verification.isManualOverrideAllowed -> Color(0xFFD97706)
+        else -> AlertCoral
+    }
+
     InfoCard(
         title = "Live Photo Check"
     ) {
@@ -440,15 +496,11 @@ private fun VerificationStatusCard(
         Text(
             text = verification.matchMessage,
             style = MaterialTheme.typography.bodyMedium,
-            color = if (verification.isLikelyMatch) {
-                MaterialTheme.colorScheme.onSecondaryContainer
-            } else {
-                MaterialTheme.colorScheme.error
-            }
+            color = statusColor
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = "Similarity: ${verification.similarityScore}%",
+            text = "Score: ${verification.similarityScore}% | ${verification.debugDetail}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSecondaryContainer
         )
@@ -461,7 +513,33 @@ private fun VerificationCompareCard(
     onConfirmTaken: () -> Unit,
     onRetakeTakenPhoto: () -> Unit
 ) {
-    SurfaceCard {
+    val bannerColor by animateColorAsState(
+        targetValue = when {
+            verification.isLikelyMatch -> ClinicTeal.copy(alpha = 0.12f)
+            verification.isManualOverrideAllowed -> Color(0xFFF59E0B).copy(alpha = 0.12f)
+            else -> AlertCoral.copy(alpha = 0.12f)
+        },
+        animationSpec = tween(350),
+        label = "verificationBanner"
+    )
+    val statusColor by animateColorAsState(
+        targetValue = when {
+            verification.isLikelyMatch -> ClinicTeal
+            verification.isManualOverrideAllowed -> Color(0xFFD97706)
+            else -> AlertCoral
+        },
+        animationSpec = tween(350),
+        label = "verificationStatus"
+    )
+
+    ElevatedCard(
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.elevatedCardElevation(2.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -486,49 +564,173 @@ private fun VerificationCompareCard(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        Text(
-            text = if (verification.isLikelyMatch) {
-                "The images look close enough. You can confirm this dose."
-            } else {
-                "The images do not look close enough yet. Retake the live photo."
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (verification.isLikelyMatch) {
-                MaterialTheme.colorScheme.onSurface
-            } else {
-                MaterialTheme.colorScheme.error
-            }
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        SectionLabel(text = "Expected medicine")
-        Spacer(modifier = Modifier.height(8.dp))
-        VerificationImagePreview(imageUri = verification.referenceImageUri)
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        SectionLabel(text = "Live photo now")
-        Spacer(modifier = Modifier.height(8.dp))
-        VerificationImagePreview(imageUri = verification.capturedImageUri)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            VerificationPhotoBox(
+                label = "Saved reference",
+                imageUri = verification.referenceImageUri,
+                modifier = Modifier.weight(1f)
+            )
+            VerificationPhotoBox(
+                label = "Live photo now",
+                imageUri = verification.capturedImageUri,
+                modifier = Modifier.weight(1f)
+            )
+        }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        Button(
-            onClick = onConfirmTaken,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = verification.isLikelyMatch
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(color = bannerColor, shape = RoundedCornerShape(12.dp))
+                .padding(12.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(text = "Confirm Taken")
+            Icon(
+                imageVector = when {
+                    verification.isLikelyMatch -> Icons.Outlined.CheckCircle
+                    verification.isManualOverrideAllowed -> Icons.Outlined.WarningAmber
+                    else -> Icons.Outlined.LocalHospital
+                },
+                contentDescription = null,
+                tint = statusColor,
+                modifier = Modifier.size(18.dp)
+            )
+            Column {
+                Text(
+                    text = verification.matchMessage,
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                    color = statusColor
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = "Score: ${verification.similarityScore}% | ${verification.debugDetail}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        if (verification.isManualOverrideAllowed && !verification.isLikelyMatch) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = "The photo looks similar but not identical. Different lighting or angle can cause this. If you are sure it is the right medicine, you can still confirm.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        when {
+            verification.isLikelyMatch -> {
+                Button(
+                    onClick = onConfirmTaken,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(vertical = 14.dp)
+                ) {
+                    Icon(Icons.Outlined.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "Confirm Taken")
+                }
+            }
+
+            verification.isManualOverrideAllowed -> {
+                FilledTonalButton(
+                    onClick = onConfirmTaken,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(vertical = 14.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = Color(0xFFF59E0B).copy(alpha = 0.18f),
+                        contentColor = Color(0xFFB45309)
+                    )
+                ) {
+                    Icon(Icons.Outlined.WarningAmber, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "Confirm Anyway (I checked)")
+                }
+            }
+
+            else -> {
+                Button(
+                    onClick = {},
+                    enabled = false,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(vertical = 14.dp)
+                ) {
+                    Text(text = "Confirm Taken")
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
         OutlinedButton(
             onClick = onRetakeTakenPhoto,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(vertical = 12.dp)
         ) {
+            Icon(
+                imageVector = Icons.Outlined.CameraAlt,
+                contentDescription = null,
+                modifier = Modifier.size(15.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
             Text(text = "Retake Photo")
+        }
+        }
+    }
+}
+
+@Composable
+private fun VerificationPhotoBox(
+    label: String,
+    imageUri: String,
+    modifier: Modifier = Modifier,
+    height: Dp = 110.dp
+) {
+    val context = LocalContext.current
+    val bitmap = remember(imageUri) {
+        runCatching {
+            context.contentResolver.openInputStream(Uri.parse(imageUri))
+                ?.use { BitmapFactory.decodeStream(it) }
+        }.getOrNull()
+    }
+
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = label,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(height)
+                    .clip(RoundedCornerShape(12.dp))
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(height)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(12.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No preview",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -778,6 +980,134 @@ private fun GroupedDoseLogCard(
 }
 
 @Composable
+private fun MedicationHistorySummaryCard(
+    summary: MedicationHistorySummary,
+    expanded: Boolean,
+    onToggle: () -> Unit
+) {
+    SurfaceCard {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconBadge(
+                icon = when {
+                    summary.missedCount > 0 -> Icons.Outlined.WarningAmber
+                    summary.takenCount > 0 -> Icons.Outlined.CheckCircle
+                    else -> Icons.Outlined.History
+                },
+                size = 42
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = summary.medicationName,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                if (summary.scheduledTimes.isNotEmpty()) {
+                    Text(
+                        text = "Times: ${summary.scheduledTimes.joinToString(", ")}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatusChip(label = "Taken ${summary.takenCount}")
+            StatusChip(label = "Missed ${summary.missedCount}")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatusChip(label = "Skipped ${summary.skippedCount}")
+            StatusChip(label = "Snoozed ${summary.snoozedCount}")
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedButton(
+            onClick = onToggle,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = if (expanded) {
+                    "Hide day-by-day details"
+                } else {
+                    "Show day-by-day details"
+                }
+            )
+        }
+
+        if (expanded) {
+            Spacer(modifier = Modifier.height(14.dp))
+            summary.dateSections.forEach { section ->
+                Text(
+                    text = section.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                section.items.forEach { item ->
+                    MedicationHistoryDetailCard(item = item)
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MedicationHistoryDetailCard(
+    item: GroupedDoseLogItem
+) {
+    OutlinedCard(
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatusChip(
+                    label = item.statusSummary,
+                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
+                StatusChip(label = "Times ${item.scheduledTimes.joinToString(", ")}")
+            }
+
+            if (item.takenAtEntries.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                item.takenAtEntries.forEach { entry ->
+                    Text(
+                        text = "Recorded: $entry",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            if (item.hasVerificationPhoto) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "Verification photo saved",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                if (!item.imageUri.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    VerificationImagePreview(
+                        imageUri = item.imageUri,
+                        size = 72.dp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun VerificationImagePreview(
     imageUri: String,
     modifier: Modifier = Modifier,
@@ -870,6 +1200,17 @@ private data class GroupedDoseLogSection(
     val items: List<GroupedDoseLogItem>
 )
 
+private data class MedicationHistorySummary(
+    val medicationKey: String,
+    val medicationName: String,
+    val scheduledTimes: List<String>,
+    val takenCount: Int,
+    val missedCount: Int,
+    val skippedCount: Int,
+    val snoozedCount: Int,
+    val dateSections: List<GroupedDoseLogSection>
+)
+
 private fun filterDoseLogsForRange(
     logs: List<DoseLogDisplayItem>,
     range: LogHistoryRange
@@ -926,6 +1267,34 @@ private fun buildGroupedDateSections(
                 items = buildGroupedDoseLogItems(dateLogs)
             )
         }
+}
+
+private fun buildMedicationHistorySummaries(
+    logs: List<DoseLogDisplayItem>
+): List<MedicationHistorySummary> {
+    return logs
+        .groupBy { it.medicationName.trim().lowercase() }
+        .map { (medicationKey, medicationLogs) ->
+            val sortedLogs = medicationLogs.sortedWith(doseLogDisplayComparator())
+            MedicationHistorySummary(
+                medicationKey = medicationKey,
+                medicationName = sortedLogs.first().medicationName,
+                scheduledTimes = sortedLogs
+                    .map { it.scheduledTime }
+                    .distinct()
+                    .sortedBy { parseTimeToMinutesForLogs(it) ?: Int.MAX_VALUE },
+                takenCount = sortedLogs.count { it.status == DoseStatus.TAKEN },
+                missedCount = sortedLogs.count { it.status == DoseStatus.MISSED },
+                skippedCount = sortedLogs.count { it.status == DoseStatus.SKIPPED },
+                snoozedCount = sortedLogs.count { it.status == DoseStatus.SNOOZED },
+                dateSections = buildGroupedDateSections(sortedLogs)
+            )
+        }
+        .sortedWith(
+            compareByDescending<MedicationHistorySummary> { it.missedCount }
+                .thenBy { firstTimeMinutes(it.scheduledTimes) ?: Int.MAX_VALUE }
+                .thenBy { it.medicationName.lowercase() }
+        )
 }
 
 private fun buildGroupedDoseLogItems(

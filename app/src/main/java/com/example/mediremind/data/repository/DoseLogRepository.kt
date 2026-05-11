@@ -14,4 +14,8 @@ class DoseLogRepository(context: Context) {
     suspend fun insertDoseLog(doseLog: DoseLog): Long {
         return doseLogDao.insertDoseLog(doseLog)
     }
+
+    suspend fun updateDoseLog(doseLog: DoseLog) {
+        doseLogDao.updateDoseLog(doseLog)
+    }
 }

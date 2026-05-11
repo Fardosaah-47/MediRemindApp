@@ -1,8 +1,6 @@
 package com.example.mediremind
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -37,6 +35,7 @@ import com.example.mediremind.data.repository.MedicationRepository
 import com.example.mediremind.data.repository.QrImportResult
 import com.example.mediremind.data.repository.QrImportParser
 import com.example.mediremind.data.repository.UserProfileRepository
+import com.example.mediremind.domain.MedicationPhotoMatcher
 import com.example.mediremind.ui.screen.home.HomeScreen
 import com.example.mediremind.ui.screen.medication.MedicationFormScreen
 import com.example.mediremind.ui.screen.medication.MedicationListScreen
@@ -58,8 +57,8 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import java.io.File
-import java.util.Calendar
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.delay
@@ -83,18 +82,14 @@ private data class PendingDoseVerification(
     val referenceImageUri: String,
     val capturedImageUri: String,
     val isLikelyMatch: Boolean,
+    val isManualOverrideAllowed: Boolean,
     val matchMessage: String,
-    val similarityScore: Int
+    val similarityScore: Int,
+    val debugDetail: String
 )
 
 private data class DoseAvailability(
     val isActionAllowed: Boolean,
-    val message: String
-)
-
-private data class PhotoComparisonResult(
-    val isLikelyMatch: Boolean,
-    val similarityScore: Int,
     val message: String
 )
 
@@ -140,6 +135,10 @@ class MainActivity : ComponentActivity() {
             val coroutineScope = rememberCoroutineScope()
 
             LaunchedEffect(Unit) {
+                cleanupExpiredVerificationPhotos(
+                    context = applicationContext,
+                    doseLogRepository = doseLogRepository
+                )
                 while (true) {
                     timeRefreshKey = currentMinuteRefreshKey()
                     delay(30_000)
@@ -171,23 +170,27 @@ class MainActivity : ComponentActivity() {
                 val referenceImageUri = expectedMedication?.referenceImageUri
 
                 if (wasSaved && capturedDose != null && capturedUri != null && !referenceImageUri.isNullOrBlank()) {
-                    val comparisonResult = compareMedicationPhotos(
-                        context = applicationContext,
-                        referenceImageUri = referenceImageUri,
-                        capturedImageUri = capturedUri.toString()
-                    )
-                    pendingDoseVerification = PendingDoseVerification(
-                        doseItem = capturedDose,
-                        referenceImageUri = referenceImageUri,
-                        capturedImageUri = capturedUri.toString(),
-                        isLikelyMatch = comparisonResult.isLikelyMatch,
-                        matchMessage = comparisonResult.message,
-                        similarityScore = comparisonResult.similarityScore
-                    )
-                    doseLoggingMessage = if (comparisonResult.isLikelyMatch) {
-                        ""
-                    } else {
-                        comparisonResult.message
+                    coroutineScope.launch {
+                        val matchResult = MedicationPhotoMatcher.compare(
+                            context = applicationContext,
+                            referenceUri = referenceImageUri,
+                            capturedUri = capturedUri.toString()
+                        )
+                        pendingDoseVerification = PendingDoseVerification(
+                            doseItem = capturedDose,
+                            referenceImageUri = referenceImageUri,
+                            capturedImageUri = capturedUri.toString(),
+                            isLikelyMatch = matchResult.zone == MedicationPhotoMatcher.MatchZone.MATCH,
+                            isManualOverrideAllowed = matchResult.zone == MedicationPhotoMatcher.MatchZone.WARNING,
+                            matchMessage = matchResult.message,
+                            similarityScore = matchResult.score,
+                            debugDetail = matchResult.debugDetail
+                        )
+                        doseLoggingMessage = if (matchResult.zone == MedicationPhotoMatcher.MatchZone.MATCH) {
+                            ""
+                        } else {
+                            matchResult.message
+                        }
                     }
                 } else {
                     if (capturedUri != null) {
@@ -270,7 +273,7 @@ class MainActivity : ComponentActivity() {
                     )
                     caregiverReportSummary = summary
                     caregiverReportQr = if (summary.totalLogged > 0) {
-                        CaregiverReportQrBuilder.generateQrBitmap(summary.qrPayload).asImageBitmap()
+                        CaregiverReportQrBuilder.generateQrBitmap(summary.qrPayload)?.asImageBitmap()
                     } else {
                         null
                     }
@@ -449,10 +452,17 @@ class MainActivity : ComponentActivity() {
                         onConfirmTaken = {
                             val verification = pendingDoseVerification
                             if (verification != null) {
-                                if (!verification.isLikelyMatch) {
+                                val canConfirm =
+                                    verification.isLikelyMatch || verification.isManualOverrideAllowed
+                                if (!canConfirm) {
                                     doseLoggingMessage = verification.matchMessage
                                 } else {
                                     coroutineScope.launch {
+                                        val shouldDeductStock = shouldDeductStockForTakenDose(
+                                            existingLogs = doseLogRepository.getAllDoseLogs(),
+                                            doseScheduleId = verification.doseItem.doseScheduleId,
+                                            logDate = currentDateOnly()
+                                        )
                                         doseLogRepository.insertDoseLog(
                                             DoseLog(
                                                 doseScheduleId = verification.doseItem.doseScheduleId,
@@ -464,6 +474,13 @@ class MainActivity : ComponentActivity() {
                                                 imageUri = verification.capturedImageUri
                                             )
                                         )
+                                        if (shouldDeductStock) {
+                                            decrementMedicationStock(
+                                                medicationId = verification.doseItem.medicationId,
+                                                medicationRepository = medicationRepository
+                                            )
+                                        }
+                                        medications = medicationRepository.getAllMedications()
                                         doseLogs = doseLogRepository.getAllDoseLogs()
                                         doseLoggingMessage =
                                             "Taken dose confirmed for ${verification.doseItem.medicationName}."
@@ -495,17 +512,31 @@ class MainActivity : ComponentActivity() {
                         onLogDose = { doseItem, status ->
                             coroutineScope.launch {
                                 val timestamp = currentTimestamp()
+                                val logDate = currentDateOnly()
+                                val shouldDeductStock = status == DoseStatus.TAKEN &&
+                                    shouldDeductStockForTakenDose(
+                                        existingLogs = doseLogRepository.getAllDoseLogs(),
+                                        doseScheduleId = doseItem.doseScheduleId,
+                                        logDate = logDate
+                                    )
                                 doseLogRepository.insertDoseLog(
                                     DoseLog(
                                         doseScheduleId = doseItem.doseScheduleId,
                                         medicationId = doseItem.medicationId,
                                         scheduledTime = doseItem.scheduledTime,
-                                        logDate = currentDateOnly(),
+                                        logDate = logDate,
                                         status = status,
                                         takenAt = if (status == DoseStatus.TAKEN) timestamp else null,
                                         imageUri = null
                                     )
                                 )
+                                if (shouldDeductStock) {
+                                    decrementMedicationStock(
+                                        medicationId = doseItem.medicationId,
+                                        medicationRepository = medicationRepository
+                                    )
+                                    medications = medicationRepository.getAllMedications()
+                                }
                                 doseLogs = doseLogRepository.getAllDoseLogs()
                                 doseLoggingMessage = when (status) {
                                     DoseStatus.SKIPPED -> "${doseItem.medicationName} marked as skipped."
@@ -853,8 +884,10 @@ private fun AppContent(
                         referenceImageUri = verification.referenceImageUri,
                         capturedImageUri = verification.capturedImageUri,
                         isLikelyMatch = verification.isLikelyMatch,
+                        isManualOverrideAllowed = verification.isManualOverrideAllowed,
                         matchMessage = verification.matchMessage,
-                        similarityScore = verification.similarityScore
+                        similarityScore = verification.similarityScore,
+                        debugDetail = verification.debugDetail
                     )
                 },
                 statusMessage = doseLoggingMessage,
@@ -1428,90 +1461,12 @@ private fun currentMinuteRefreshKey(): String {
     return SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
 }
 
-private fun compareMedicationPhotos(
-    context: Context,
-    referenceImageUri: String,
-    capturedImageUri: String
-): PhotoComparisonResult {
-    val referenceBitmap = loadBitmapFromUri(context, referenceImageUri)
-    val capturedBitmap = loadBitmapFromUri(context, capturedImageUri)
-
-    if (referenceBitmap == null || capturedBitmap == null) {
-        return PhotoComparisonResult(
-            isLikelyMatch = false,
-            similarityScore = 0,
-            message = "Could not compare the medicine photos. Retake the photo and try again."
-        )
-    }
-
-    val referenceHash = buildAverageHash(referenceBitmap)
-    val capturedHash = buildAverageHash(capturedBitmap)
-    val distance = hammingDistance(referenceHash, capturedHash)
-    val similarityScore = ((64 - distance) * 100 / 64).coerceIn(0, 100)
-    val isLikelyMatch = similarityScore >= 58
-
-    return PhotoComparisonResult(
-        isLikelyMatch = isLikelyMatch,
-        similarityScore = similarityScore,
-        message = if (isLikelyMatch) {
-            "Live photo looks close enough to the saved medicine reference."
-        } else {
-            "Live photo does not look close enough to the saved medicine. Please retake the actual medicine photo."
-        }
-    )
-}
-
-private fun loadBitmapFromUri(
-    context: Context,
-    uriString: String
-): Bitmap? {
-    return runCatching {
-        context.contentResolver.openInputStream(Uri.parse(uriString))?.use { inputStream ->
-            BitmapFactory.decodeStream(inputStream)
-        }
-    }.getOrNull()
-}
-
-private fun buildAverageHash(bitmap: Bitmap): Long {
-    val croppedBitmap = centerCropSquare(bitmap)
-    val resizedBitmap = Bitmap.createScaledBitmap(croppedBitmap, 8, 8, true)
-    val pixels = IntArray(64)
-    resizedBitmap.getPixels(pixels, 0, 8, 0, 0, 8, 8)
-    val grayscaleValues = pixels.map { pixel ->
-        val red = (pixel shr 16) and 0xFF
-        val green = (pixel shr 8) and 0xFF
-        val blue = pixel and 0xFF
-        (red + green + blue) / 3
-    }
-    val average = grayscaleValues.average()
-
-    var hash = 0L
-    grayscaleValues.forEachIndexed { index, value ->
-        if (value >= average) {
-            hash = hash or (1L shl index)
-        }
-    }
-
-    return hash
-}
-
-private fun centerCropSquare(bitmap: Bitmap): Bitmap {
-    val size = minOf(bitmap.width, bitmap.height)
-    val xOffset = (bitmap.width - size) / 2
-    val yOffset = (bitmap.height - size) / 2
-    return Bitmap.createBitmap(bitmap, xOffset, yOffset, size, size)
-}
-
-private fun hammingDistance(first: Long, second: Long): Int {
-    return java.lang.Long.bitCount(first xor second)
-}
-
 private fun createAppImageUri(
     context: Context,
     folderName: String,
     filePrefix: String
 ): Uri {
-    val imageDirectory = File(context.cacheDir, folderName).apply {
+    val imageDirectory = File(context.filesDir, "medication_photos/$folderName").apply {
         mkdirs()
     }
     val imageFile = File(
@@ -1524,6 +1479,73 @@ private fun createAppImageUri(
         "${context.packageName}.fileprovider",
         imageFile
     )
+}
+
+private suspend fun cleanupExpiredVerificationPhotos(
+    context: Context,
+    doseLogRepository: DoseLogRepository
+) {
+    val verificationDirectory = File(context.filesDir, "medication_photos/verification_images")
+    if (!verificationDirectory.exists()) return
+
+    val cutoffMillis = System.currentTimeMillis() - 24L * 60L * 60L * 1000L
+    val deletedFileNames = verificationDirectory
+        .listFiles()
+        .orEmpty()
+        .filter { file -> file.isFile && file.lastModified() < cutoffMillis }
+        .mapNotNull { file ->
+            val fileName = file.name
+            if (file.delete()) fileName else null
+        }
+        .toSet()
+
+    val existingFileNames = verificationDirectory
+        .listFiles()
+        .orEmpty()
+        .filter { file -> file.isFile }
+        .map { file -> file.name }
+        .toSet()
+
+    doseLogRepository.getAllDoseLogs()
+        .filter { log -> !log.imageUri.isNullOrBlank() }
+        .forEach { log ->
+            val imageFileName = log.imageUri?.let { imageUri ->
+                Uri.parse(imageUri).lastPathSegment?.substringAfterLast('/')
+            }
+            val shouldClearPhotoReference = imageFileName != null &&
+                imageFileName.startsWith("dose_") &&
+                (imageFileName in deletedFileNames || imageFileName !in existingFileNames)
+
+            if (shouldClearPhotoReference) {
+                doseLogRepository.updateDoseLog(log.copy(imageUri = null))
+            }
+        }
+}
+
+private suspend fun decrementMedicationStock(
+    medicationId: Long,
+    medicationRepository: MedicationRepository
+) {
+    val medication = medicationRepository.getMedicationById(medicationId) ?: return
+    if (medication.currentStockAmount <= 0.0) return
+
+    medicationRepository.updateMedication(
+        medication.copy(
+            currentStockAmount = (medication.currentStockAmount - 1.0).coerceAtLeast(0.0)
+        )
+    )
+}
+
+private fun shouldDeductStockForTakenDose(
+    existingLogs: List<DoseLog>,
+    doseScheduleId: Long,
+    logDate: String
+): Boolean {
+    return existingLogs.none { log ->
+        log.doseScheduleId == doseScheduleId &&
+            log.logDate == logDate &&
+            log.status == DoseStatus.TAKEN
+    }
 }
 
 private suspend fun importQrPayload(

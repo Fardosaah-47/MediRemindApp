@@ -54,6 +54,7 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.google.play.services.code.scanner)
+    implementation("com.google.mlkit:object-detection:17.0.2")
     implementation(libs.zxing.core)
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit)

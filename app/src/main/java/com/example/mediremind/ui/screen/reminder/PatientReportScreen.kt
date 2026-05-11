@@ -230,7 +230,11 @@ fun PatientReportScreen(
                     )
                 } else {
                     Text(
-                        text = "No QR is ready yet. Log at least one dose so the caregiver report can be generated.",
+                        text = if (totalLogged > 0) {
+                            "Report is too large to encode as QR. Share the text summary instead."
+                        } else {
+                            "No QR is ready yet. Log at least one dose so the caregiver report can be generated."
+                        },
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
