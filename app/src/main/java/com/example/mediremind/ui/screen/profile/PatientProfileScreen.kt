@@ -1,6 +1,7 @@
 package com.example.mediremind.ui.screen.profile
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,14 +20,17 @@ import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.Cake
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.Button
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,28 +51,35 @@ import com.example.mediremind.ui.theme.MediRemindTheme
 fun PatientProfileScreen(
     modifier: Modifier = Modifier,
     existingProfile: UserProfile? = null,
+    profiles: List<UserProfile> = emptyList(),
+    activePatientId: Long = existingProfile?.id ?: 0L,
     onSaveProfile: (UserProfile) -> Unit = {},
+    onSwitchProfile: (UserProfile) -> Unit = {},
     onBackClick: () -> Unit = {}
 ) {
-    var fullName by remember(existingProfile?.id) { mutableStateOf(existingProfile?.fullName.orEmpty()) }
-    var age by remember(existingProfile?.id) {
-        mutableStateOf(existingProfile?.age?.toString().orEmpty())
-    }
-    var condition by remember(existingProfile?.id) {
-        mutableStateOf(existingProfile?.condition.orEmpty())
-    }
-    var caregiverName by remember(existingProfile?.id) {
-        mutableStateOf(existingProfile?.caregiverName.orEmpty())
-    }
-    var formMessage by remember(existingProfile?.id) { mutableStateOf("") }
+    var editingProfile by remember { mutableStateOf(existingProfile) }
+    var fullName by remember { mutableStateOf(existingProfile?.fullName.orEmpty()) }
+    var age by remember { mutableStateOf(existingProfile?.age?.toString().orEmpty()) }
+    var condition by remember { mutableStateOf(existingProfile?.condition.orEmpty()) }
+    var caregiverName by remember { mutableStateOf(existingProfile?.caregiverName.orEmpty()) }
+    var formMessage by remember { mutableStateOf("") }
 
-    val isEditing = existingProfile != null
+    LaunchedEffect(existingProfile?.id) {
+        editingProfile = existingProfile
+        fullName = existingProfile?.fullName.orEmpty()
+        age = existingProfile?.age?.toString().orEmpty()
+        condition = existingProfile?.condition.orEmpty()
+        caregiverName = existingProfile?.caregiverName.orEmpty()
+        formMessage = ""
+    }
+
+    val isEditing = editingProfile != null
     val displayName = fullName.ifBlank { "New Patient" }
 
     Scaffold(
         topBar = {
             MediRemindTopBar(
-                title = if (isEditing) "Edit Profile" else "Patient Profile",
+                title = "Patient Profiles",
                 onBackClick = onBackClick
             )
         },
@@ -106,10 +117,10 @@ fun PatientProfileScreen(
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onPrimary
                         )
-                        if (isEditing && !existingProfile?.condition.isNullOrBlank()) {
+                        if (isEditing && !editingProfile?.condition.isNullOrBlank()) {
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = existingProfile?.condition.orEmpty(),
+                                text = editingProfile?.condition.orEmpty(),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.75f)
                             )
@@ -120,6 +131,61 @@ fun PatientProfileScreen(
 
             item {
                 Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp)) {
+                    if (profiles.isNotEmpty()) {
+                        Text(
+                            text = "SAVED PATIENTS",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            profiles.forEach { profile ->
+                                PatientProfileRow(
+                                    profile = profile,
+                                    isActive = profile.id == activePatientId,
+                                    onSwitch = {
+                                        onSwitchProfile(profile)
+                                        editingProfile = profile
+                                        fullName = profile.fullName
+                                        age = profile.age?.toString().orEmpty()
+                                        condition = profile.condition.orEmpty()
+                                        caregiverName = profile.caregiverName.orEmpty()
+                                        formMessage = ""
+                                    },
+                                    onEdit = {
+                                        editingProfile = profile
+                                        fullName = profile.fullName
+                                        age = profile.age?.toString().orEmpty()
+                                        condition = profile.condition.orEmpty()
+                                        caregiverName = profile.caregiverName.orEmpty()
+                                        formMessage = ""
+                                    }
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        OutlinedButton(
+                            onClick = {
+                                editingProfile = null
+                                fullName = ""
+                                age = ""
+                                condition = ""
+                                caregiverName = ""
+                                formMessage = ""
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(vertical = 14.dp)
+                        ) {
+                            Text("Add Another Patient")
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+                    }
+
                     Text(
                         text = "PATIENT DETAILS",
                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
@@ -182,7 +248,7 @@ fun PatientProfileScreen(
                                 formMessage = ""
                                 onSaveProfile(
                                     UserProfile(
-                                        id = existingProfile?.id ?: 0,
+                                        id = editingProfile?.id ?: 0,
                                         fullName = fullName.trim(),
                                         age = age.toIntOrNull(),
                                         condition = condition.trim().ifBlank { null },
@@ -201,6 +267,50 @@ fun PatientProfileScreen(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PatientProfileRow(
+    profile: UserProfile,
+    isActive: Boolean,
+    onSwitch: () -> Unit,
+    onEdit: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onSwitch),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(1.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            InitialsAvatar(name = profile.fullName, size = 44)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = profile.fullName,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = profile.condition ?: "No condition added",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.62f)
+                )
+            }
+            AssistChip(
+                onClick = onSwitch,
+                label = { Text(if (isActive) "Active" else "Use") }
+            )
+            OutlinedButton(onClick = onEdit) {
+                Text("Edit")
             }
         }
     }

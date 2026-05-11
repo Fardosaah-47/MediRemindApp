@@ -111,6 +111,7 @@ class MainActivity : ComponentActivity() {
             var selectedSchedule by remember { mutableStateOf<DoseSchedule?>(null) }
             var medicationReferenceImageUri by remember { mutableStateOf<String?>(null) }
             var userProfile by remember { mutableStateOf<UserProfile?>(null) }
+            var allProfiles by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
             var qrImportMessage by remember {
                 mutableStateOf("Scan a hospital or pharmacy QR code to load medication details.")
             }
@@ -130,6 +131,7 @@ class MainActivity : ComponentActivity() {
             var pendingMedicationReferenceUri by remember { mutableStateOf<Uri?>(null) }
             var pendingTakenDose by remember { mutableStateOf<DoseLoggingItem?>(null) }
             var pendingVerificationUri by remember { mutableStateOf<Uri?>(null) }
+            var activePatientId by remember { mutableStateOf(UserProfileRepository.LEGACY_PATIENT_ID) }
             var timeRefreshKey by remember { mutableStateOf(currentMinuteRefreshKey()) }
 
             val coroutineScope = rememberCoroutineScope()
@@ -208,8 +210,9 @@ class MainActivity : ComponentActivity() {
             }
 
             LaunchedEffect(currentScreen, timeRefreshKey) {
+                activePatientId = userProfileRepository.getActivePatientId()
                 if (currentScreen == AppScreen.HOME || currentScreen == AppScreen.MEDICATION_LIST) {
-                    medications = medicationRepository.getAllMedications()
+                    medications = medicationRepository.getMedicationsForPatient(activePatientId)
                 }
                 if (
                     currentScreen == AppScreen.HOME ||
@@ -219,10 +222,11 @@ class MainActivity : ComponentActivity() {
                     currentScreen == AppScreen.PROFILE ||
                     currentScreen == AppScreen.PATIENT_REPORT
                 ) {
-                    medications = medicationRepository.getAllMedications()
+                    medications = medicationRepository.getMedicationsForPatient(activePatientId)
                 }
                 if (currentScreen == AppScreen.HOME || currentScreen == AppScreen.PROFILE || currentScreen == AppScreen.PATIENT_REPORT) {
-                    userProfile = userProfileRepository.getFirstUserProfile()
+                    allProfiles = userProfileRepository.getAllProfiles()
+                    userProfile = userProfileRepository.getActiveProfile()
                 }
                 if (
                     currentScreen == AppScreen.HOME ||
@@ -230,21 +234,21 @@ class MainActivity : ComponentActivity() {
                     currentScreen == AppScreen.DOSE_LOGGING ||
                     currentScreen == AppScreen.PATIENT_REPORT
                 ) {
-                    schedules = doseScheduleRepository.getAllDoseSchedules()
+                    schedules = doseScheduleRepository.getSchedulesForPatient(activePatientId)
                 }
                 if (
                     currentScreen == AppScreen.HOME ||
                     currentScreen == AppScreen.DOSE_LOGGING ||
                     currentScreen == AppScreen.PATIENT_REPORT
                 ) {
-                    doseLogs = doseLogRepository.getAllDoseLogs()
+                    doseLogs = doseLogRepository.getLogsForPatient(activePatientId)
                 }
                 if (
                     currentScreen == AppScreen.DOSE_LOGGING ||
                     currentScreen == AppScreen.PATIENT_REPORT
                 ) {
-                    val loadedSchedules = doseScheduleRepository.getAllDoseSchedules()
-                    val loadedDoseLogs = doseLogRepository.getAllDoseLogs()
+                    val loadedSchedules = doseScheduleRepository.getSchedulesForPatient(activePatientId)
+                    val loadedDoseLogs = doseLogRepository.getLogsForPatient(activePatientId)
                     val autoMissedLogs = buildAutoMissedDoseLogs(
                         schedules = loadedSchedules,
                         existingLogs = loadedDoseLogs,
@@ -252,14 +256,14 @@ class MainActivity : ComponentActivity() {
                     )
                     if (autoMissedLogs.isNotEmpty()) {
                         autoMissedLogs.forEach { doseLogRepository.insertDoseLog(it) }
-                        doseLogs = doseLogRepository.getAllDoseLogs()
+                        doseLogs = doseLogRepository.getLogsForPatient(activePatientId)
                     }
                 }
                 if (currentScreen == AppScreen.PATIENT_REPORT) {
-                    val loadedProfile = userProfileRepository.getFirstUserProfile()
-                    val loadedMedications = medicationRepository.getAllMedications()
-                    val loadedSchedules = doseScheduleRepository.getAllDoseSchedules()
-                    val loadedDoseLogs = doseLogRepository.getAllDoseLogs()
+                    val loadedProfile = userProfileRepository.getActiveProfile()
+                    val loadedMedications = medicationRepository.getMedicationsForPatient(activePatientId)
+                    val loadedSchedules = doseScheduleRepository.getSchedulesForPatient(activePatientId)
+                    val loadedDoseLogs = doseLogRepository.getLogsForPatient(activePatientId)
 
                     userProfile = loadedProfile
                     medications = loadedMedications
@@ -356,21 +360,23 @@ class MainActivity : ComponentActivity() {
                         },
                         onSaveMedication = { medication ->
                             coroutineScope.launch {
+                                val patientId = activePatientId
+                                val medicationToSave = medication.copy(patientId = patientId)
                                 val savedMedicationId = if (medication.id == 0L) {
-                                    medicationRepository.insertMedication(medication)
+                                    medicationRepository.insertMedication(medicationToSave)
                                 } else {
-                                    medicationRepository.updateMedication(medication)
+                                    medicationRepository.updateMedication(medicationToSave)
                                     medication.id
                                 }
 
                                 if (savedMedicationId != 0L) {
                                     syncMedicationSchedulesFromMedicationDetails(
-                                        medication = medication.copy(id = savedMedicationId),
+                                        medication = medicationToSave.copy(id = savedMedicationId),
                                         doseScheduleRepository = doseScheduleRepository
                                     )
                                 }
-                                medications = medicationRepository.getAllMedications()
-                                schedules = doseScheduleRepository.getAllDoseSchedules()
+                                medications = medicationRepository.getMedicationsForPatient(patientId)
+                                schedules = doseScheduleRepository.getSchedulesForPatient(patientId)
                                 selectedMedication = null
                                 medicationReferenceImageUri = null
                                 currentScreen = AppScreen.MEDICATION_LIST
@@ -386,9 +392,9 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                                 medicationRepository.deleteMedication(medication)
-                                medications = medicationRepository.getAllMedications()
-                                schedules = doseScheduleRepository.getAllDoseSchedules()
-                                doseLogs = doseLogRepository.getAllDoseLogs()
+                                medications = medicationRepository.getMedicationsForPatient(activePatientId)
+                                schedules = doseScheduleRepository.getSchedulesForPatient(activePatientId)
+                                doseLogs = doseLogRepository.getLogsForPatient(activePatientId)
                                 selectedMedication = null
                                 medicationReferenceImageUri = null
                                 currentScreen = AppScreen.MEDICATION_LIST
@@ -400,12 +406,15 @@ class MainActivity : ComponentActivity() {
                         },
                         onSaveSchedules = { newSchedules ->
                             coroutineScope.launch {
-                                if (selectedSchedule != null && newSchedules.size == 1) {
-                                    doseScheduleRepository.updateDoseSchedule(newSchedules.first())
-                                } else {
-                                    doseScheduleRepository.insertDoseSchedules(newSchedules)
+                                val schedulesToSave = newSchedules.map { schedule ->
+                                    schedule.copy(patientId = activePatientId)
                                 }
-                                schedules = doseScheduleRepository.getAllDoseSchedules()
+                                if (selectedSchedule != null && newSchedules.size == 1) {
+                                    doseScheduleRepository.updateDoseSchedule(schedulesToSave.first())
+                                } else {
+                                    doseScheduleRepository.insertDoseSchedules(schedulesToSave)
+                                }
+                                schedules = doseScheduleRepository.getSchedulesForPatient(activePatientId)
                                 selectedSchedule = null
                                 currentScreen = AppScreen.SCHEDULE_LIST
                             }
@@ -459,12 +468,13 @@ class MainActivity : ComponentActivity() {
                                 } else {
                                     coroutineScope.launch {
                                         val shouldDeductStock = shouldDeductStockForTakenDose(
-                                            existingLogs = doseLogRepository.getAllDoseLogs(),
+                                            existingLogs = doseLogRepository.getLogsForPatient(activePatientId),
                                             doseScheduleId = verification.doseItem.doseScheduleId,
                                             logDate = currentDateOnly()
                                         )
                                         doseLogRepository.insertDoseLog(
                                             DoseLog(
+                                                patientId = activePatientId,
                                                 doseScheduleId = verification.doseItem.doseScheduleId,
                                                 medicationId = verification.doseItem.medicationId,
                                                 scheduledTime = verification.doseItem.scheduledTime,
@@ -477,11 +487,12 @@ class MainActivity : ComponentActivity() {
                                         if (shouldDeductStock) {
                                             decrementMedicationStock(
                                                 medicationId = verification.doseItem.medicationId,
+                                                patientId = activePatientId,
                                                 medicationRepository = medicationRepository
                                             )
                                         }
-                                        medications = medicationRepository.getAllMedications()
-                                        doseLogs = doseLogRepository.getAllDoseLogs()
+                                        medications = medicationRepository.getMedicationsForPatient(activePatientId)
+                                        doseLogs = doseLogRepository.getLogsForPatient(activePatientId)
                                         doseLoggingMessage =
                                             "Taken dose confirmed for ${verification.doseItem.medicationName}."
                                         pendingDoseVerification = null
@@ -515,12 +526,13 @@ class MainActivity : ComponentActivity() {
                                 val logDate = currentDateOnly()
                                 val shouldDeductStock = status == DoseStatus.TAKEN &&
                                     shouldDeductStockForTakenDose(
-                                        existingLogs = doseLogRepository.getAllDoseLogs(),
+                                        existingLogs = doseLogRepository.getLogsForPatient(activePatientId),
                                         doseScheduleId = doseItem.doseScheduleId,
                                         logDate = logDate
                                     )
                                 doseLogRepository.insertDoseLog(
                                     DoseLog(
+                                        patientId = activePatientId,
                                         doseScheduleId = doseItem.doseScheduleId,
                                         medicationId = doseItem.medicationId,
                                         scheduledTime = doseItem.scheduledTime,
@@ -533,11 +545,12 @@ class MainActivity : ComponentActivity() {
                                 if (shouldDeductStock) {
                                     decrementMedicationStock(
                                         medicationId = doseItem.medicationId,
+                                        patientId = activePatientId,
                                         medicationRepository = medicationRepository
                                     )
-                                    medications = medicationRepository.getAllMedications()
+                                    medications = medicationRepository.getMedicationsForPatient(activePatientId)
                                 }
-                                doseLogs = doseLogRepository.getAllDoseLogs()
+                                doseLogs = doseLogRepository.getLogsForPatient(activePatientId)
                                 doseLoggingMessage = when (status) {
                                     DoseStatus.SKIPPED -> "${doseItem.medicationName} marked as skipped."
                                     DoseStatus.SNOOZED -> "${doseItem.medicationName} marked as snoozed."
@@ -555,8 +568,24 @@ class MainActivity : ComponentActivity() {
                         onSaveUserProfile = { profile ->
                             coroutineScope.launch {
                                 userProfileRepository.saveUserProfile(profile)
-                                userProfile = userProfileRepository.getFirstUserProfile()
+                                activePatientId = userProfileRepository.getActivePatientId()
+                                allProfiles = userProfileRepository.getAllProfiles()
+                                userProfile = userProfileRepository.getActiveProfile()
+                                medications = medicationRepository.getMedicationsForPatient(activePatientId)
+                                schedules = doseScheduleRepository.getSchedulesForPatient(activePatientId)
+                                doseLogs = doseLogRepository.getLogsForPatient(activePatientId)
                                 currentScreen = AppScreen.HOME
+                            }
+                        },
+                        onSwitchUserProfile = { profile ->
+                            coroutineScope.launch {
+                                userProfileRepository.setActivePatientId(profile.id)
+                                activePatientId = profile.id
+                                userProfile = profile
+                                allProfiles = userProfileRepository.getAllProfiles()
+                                medications = medicationRepository.getMedicationsForPatient(profile.id)
+                                schedules = doseScheduleRepository.getSchedulesForPatient(profile.id)
+                                doseLogs = doseLogRepository.getLogsForPatient(profile.id)
                             }
                         },
                         onScanMedicationQr = {
@@ -581,11 +610,12 @@ class MainActivity : ComponentActivity() {
                                         try {
                                             val importResult = importQrPayload(
                                                 rawValue = rawValue,
+                                                patientId = activePatientId,
                                                 medicationRepository = medicationRepository,
                                                 doseScheduleRepository = doseScheduleRepository
                                             )
-                                            medications = medicationRepository.getAllMedications()
-                                            schedules = doseScheduleRepository.getAllDoseSchedules()
+                                            medications = medicationRepository.getMedicationsForPatient(activePatientId)
+                                            schedules = doseScheduleRepository.getSchedulesForPatient(activePatientId)
                                             if (importResult.insertedMedicationIds.size == 1) {
                                                 val importedMedication = medications.firstOrNull {
                                                     it.id == importResult.insertedMedicationIds.first()
@@ -657,6 +687,8 @@ class MainActivity : ComponentActivity() {
                                 }
                         },
                         userProfile = userProfile,
+                        allProfiles = allProfiles,
+                        activePatientId = activePatientId,
                         onBackFromCaregiverQr = {
                             currentScreen = AppScreen.HOME
                         }
@@ -706,6 +738,7 @@ private fun AppContent(
     qrRawPreview: String,
     onBackFromQrImport: () -> Unit,
     onSaveUserProfile: (UserProfile) -> Unit,
+    onSwitchUserProfile: (UserProfile) -> Unit,
     onScanMedicationQr: () -> Unit,
     caregiverReportSummary: CaregiverReportSummary?,
     caregiverReportQr: ImageBitmap?,
@@ -713,6 +746,8 @@ private fun AppContent(
     scannedCaregiverReportMessage: String,
     onScanCaregiverReportQr: () -> Unit,
     userProfile: UserProfile?,
+    allProfiles: List<UserProfile>,
+    activePatientId: Long,
     onBackFromCaregiverQr: () -> Unit
 ) {
     when (currentScreen) {
@@ -902,6 +937,8 @@ private fun AppContent(
         AppScreen.QR_IMPORT -> {
             QrImportScreen(
                 modifier = modifier,
+                activePatientName = userProfile?.fullName?.takeIf { it.isNotBlank() }
+                    ?: "Patient profile not set",
                 importMessage = qrImportMessage,
                 rawScanPreview = qrRawPreview,
                 onScanQrClick = onScanMedicationQr,
@@ -913,7 +950,10 @@ private fun AppContent(
             PatientProfileScreen(
                 modifier = modifier,
                 existingProfile = userProfile,
+                profiles = allProfiles,
+                activePatientId = activePatientId,
                 onSaveProfile = onSaveUserProfile,
+                onSwitchProfile = onSwitchUserProfile,
                 onBackClick = onBackFromCaregiverQr
             )
         }
@@ -1108,6 +1148,7 @@ private fun buildAutoMissedDoseLogs(
                     null
                 } else {
                     DoseLog(
+                        patientId = schedule.patientId,
                         doseScheduleId = schedule.id,
                         medicationId = schedule.medicationId,
                         scheduledTime = schedule.time,
@@ -1322,23 +1363,29 @@ private suspend fun syncMedicationSchedulesFromMedicationDetails(
     doseScheduleRepository: DoseScheduleRepository
 ) {
     val inferredFrequency = inferDoseFrequencyFromDosageText(medication.dosage) ?: return
-    val existingSchedules = doseScheduleRepository.getSchedulesForMedication(medication.id)
+    val existingSchedules = doseScheduleRepository.getSchedulesForMedicationForPatient(
+        medicationId = medication.id,
+        patientId = medication.patientId
+    )
     val todayDate = currentDateOnly()
 
     if (existingSchedules.isEmpty()) {
-        val startDate = todayDate
-        val endDate = calculateEndDateFromMedication(
-            medication = medication,
-            frequency = inferredFrequency,
-            startDate = startDate
-        )
         val newSchedules = defaultReminderTimesForFrequency(inferredFrequency).map { time ->
+            val startDate = startDateForNewReminderTime(
+                time = time,
+                todayDate = todayDate
+            )
             DoseSchedule(
+                patientId = medication.patientId,
                 medicationId = medication.id,
                 time = time,
                 frequency = inferredFrequency,
                 startDate = startDate,
-                endDate = endDate
+                endDate = calculateEndDateFromMedication(
+                    medication = medication,
+                    frequency = inferredFrequency,
+                    startDate = startDate
+                )
             )
         }
         doseScheduleRepository.insertDoseSchedules(newSchedules)
@@ -1382,6 +1429,7 @@ private suspend fun syncMedicationSchedulesFromMedicationDetails(
     if (activeSchedules.size < reminderTimes.size) {
         val newSchedules = reminderTimes.drop(activeSchedules.size).map { time ->
             DoseSchedule(
+                patientId = medication.patientId,
                 medicationId = medication.id,
                 time = time,
                 frequency = inferredFrequency,
@@ -1455,6 +1503,19 @@ private fun defaultReminderTimesForFrequency(
         com.example.mediremind.data.model.DoseFrequency.THREE_TIMES_DAILY -> listOf("09:00 AM", "01:00 PM", "09:00 PM")
         com.example.mediremind.data.model.DoseFrequency.WEEKLY -> listOf("09:00 AM")
         com.example.mediremind.data.model.DoseFrequency.AS_NEEDED -> listOf("09:00 AM")
+    }
+}
+
+private fun startDateForNewReminderTime(
+    time: String,
+    todayDate: String
+): String {
+    val scheduleMinutes = parseTimeToMinutes(time) ?: return todayDate
+    val lateWindowMinutes = 60
+    return if (currentMinutesOfDay() > scheduleMinutes + lateWindowMinutes) {
+        plusDays(todayDate, 1)
+    } else {
+        todayDate
     }
 }
 
@@ -1543,9 +1604,13 @@ private suspend fun cleanupExpiredVerificationPhotos(
 
 private suspend fun decrementMedicationStock(
     medicationId: Long,
+    patientId: Long,
     medicationRepository: MedicationRepository
 ) {
-    val medication = medicationRepository.getMedicationById(medicationId) ?: return
+    val medication = medicationRepository.getMedicationByIdForPatient(
+        id = medicationId,
+        patientId = patientId
+    ) ?: return
     if (medication.currentStockAmount <= 0.0) return
 
     medicationRepository.updateMedication(
@@ -1569,15 +1634,15 @@ private fun shouldDeductStockForTakenDose(
 
 private suspend fun importQrPayload(
     rawValue: String,
+    patientId: Long,
     medicationRepository: MedicationRepository,
     doseScheduleRepository: DoseScheduleRepository
 ): QrImportResult {
     val payload = QrImportParser.parse(rawValue)
-    val startDate = currentDateOnly()
-    val defaultEndDate = plusDays(startDate, 29)
+    val todayDate = currentDateOnly()
     val insertedMedicationIds = mutableListOf<Long>()
     var autoScheduledCount = 0
-    val existingMedications = medicationRepository.getAllMedications()
+    val existingMedications = medicationRepository.getMedicationsForPatient(patientId)
 
     payload.medications.forEach { importedMedication ->
         val matchedMedication = existingMedications.firstOrNull { existingMedication ->
@@ -1589,6 +1654,7 @@ private suspend fun importQrPayload(
             medicationRepository.updateMedication(
                 importedMedication.medication.copy(
                     id = matchedMedication.id,
+                    patientId = patientId,
                     referenceImageUri = matchedMedication.referenceImageUri
                         ?: importedMedication.medication.referenceImageUri,
                     isQrImported = true
@@ -1596,11 +1662,16 @@ private suspend fun importQrPayload(
             )
             matchedMedication.id
         } else {
-            medicationRepository.insertMedication(importedMedication.medication)
+            medicationRepository.insertMedication(
+                importedMedication.medication.copy(patientId = patientId)
+            )
         }
         insertedMedicationIds.add(medicationId)
 
-        val existingSchedules = doseScheduleRepository.getSchedulesForMedication(medicationId)
+        val existingSchedules = doseScheduleRepository.getSchedulesForMedicationForPatient(
+            medicationId = medicationId,
+            patientId = patientId
+        )
             .filter { schedule ->
                 schedule.endDate.isBlank() || isScheduleActiveOnOrAfterToday(
                     schedule = schedule,
@@ -1612,24 +1683,34 @@ private suspend fun importQrPayload(
         val desiredCount = desiredTimes.size
 
         existingSchedules.take(desiredCount).forEachIndexed { index, schedule ->
+            val startDate = startDateForNewReminderTime(
+                time = desiredTimes[index],
+                todayDate = todayDate
+            )
             doseScheduleRepository.updateDoseSchedule(
                 schedule.copy(
+                    patientId = patientId,
                     time = desiredTimes[index],
                     frequency = importedMedication.frequency,
                     startDate = startDate,
-                    endDate = defaultEndDate
+                    endDate = plusDays(startDate, 29)
                 )
             )
         }
 
         if (existingSchedules.size < desiredCount) {
             val schedulesToSave = desiredTimes.drop(existingSchedules.size).map { time ->
+                val startDate = startDateForNewReminderTime(
+                    time = time,
+                    todayDate = todayDate
+                )
                 DoseSchedule(
+                    patientId = patientId,
                     medicationId = medicationId,
                     time = time,
                     frequency = importedMedication.frequency,
                     startDate = startDate,
-                    endDate = defaultEndDate
+                    endDate = plusDays(startDate, 29)
                 )
             }
             doseScheduleRepository.insertDoseSchedules(schedulesToSave)

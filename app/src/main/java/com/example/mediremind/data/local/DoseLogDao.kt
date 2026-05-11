@@ -22,6 +22,12 @@ interface DoseLogDao {
     @Query("SELECT * FROM dose_logs ORDER BY id DESC")
     suspend fun getAllDoseLogs(): List<DoseLog>
 
+    @Query("SELECT * FROM dose_logs WHERE patientId = :patientId ORDER BY id DESC")
+    suspend fun getLogsForPatient(patientId: Long): List<DoseLog>
+
     @Query("SELECT * FROM dose_logs WHERE doseScheduleId = :doseScheduleId ORDER BY id DESC")
     suspend fun getLogsForSchedule(doseScheduleId: Long): List<DoseLog>
+
+    @Query("SELECT * FROM dose_logs WHERE doseScheduleId = :doseScheduleId AND patientId = :patientId ORDER BY id DESC")
+    suspend fun getLogsForScheduleForPatient(doseScheduleId: Long, patientId: Long): List<DoseLog>
 }

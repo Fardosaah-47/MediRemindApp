@@ -1,0 +1,23 @@
+{
+  "type": "mediremind_report_v2",
+  "patient": "Mary Achieng",
+  "caregiver": "Jane Achieng",
+  "date": "2026-05-11",
+  "adherence": 83,
+  "taken": 10,
+  "skipped": 1,
+  "snoozed": 1,
+  "missed": 0,
+  "logged": 12,
+  "medications": [
+    {
+      "name": "Metformin",
+      "taken": 10,
+      "skipped": 1,
+      "snoozed": 1,
+      "missed": 0,
+      "logged": 12
+    }
+  ],
+  "truncated": false
+}

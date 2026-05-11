@@ -1,0 +1,31 @@
+{
+  "type": "mediremind_rx_v1",
+  "source": "MediRemind Demo Pharmacy",
+  "medications": [
+    {
+      "name": "Metformin",
+      "form": "TABLET",
+      "dosage": "500mg tablet - take one tablet twice daily with meals",
+      "frequency": "TWICE_DAILY",
+      "times": [
+        "08:00 AM",
+        "08:00 PM"
+      ],
+      "stockAmount": 60,
+      "stockUnit": "tablets",
+      "refillAlertAt": 10
+    },
+    {
+      "name": "Amlodipine",
+      "form": "TABLET",
+      "dosage": "5mg tablet - take one tablet once daily in the morning",
+      "frequency": "ONCE_DAILY",
+      "times": [
+        "09:00 AM"
+      ],
+      "stockAmount": 30,
+      "stockUnit": "tablets",
+      "refillAlertAt": 7
+    }
+  ]
+}

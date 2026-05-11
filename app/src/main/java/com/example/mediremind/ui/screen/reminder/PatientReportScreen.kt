@@ -91,7 +91,7 @@ fun PatientReportScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Share one clean summary with a caregiver after doses have been logged.",
+                            text = "Share one clean 7-day summary with a caregiver after doses have been logged.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -112,7 +112,7 @@ fun PatientReportScreen(
                         modifier = Modifier.height(14.dp)
                     )
                     Text(
-                        text = "Report date: $reportDate",
+                        text = "7-day report ending: $reportDate",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

@@ -11,6 +11,10 @@ class DoseLogRepository(context: Context) {
         return doseLogDao.getAllDoseLogs()
     }
 
+    suspend fun getLogsForPatient(patientId: Long): List<DoseLog> {
+        return doseLogDao.getLogsForPatient(patientId)
+    }
+
     suspend fun insertDoseLog(doseLog: DoseLog): Long {
         return doseLogDao.insertDoseLog(doseLog)
     }

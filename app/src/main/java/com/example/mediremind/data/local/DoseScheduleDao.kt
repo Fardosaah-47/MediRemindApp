@@ -25,6 +25,12 @@ interface DoseScheduleDao {
     @Query("SELECT * FROM dose_schedules ORDER BY time ASC")
     suspend fun getAllDoseSchedules(): List<DoseSchedule>
 
+    @Query("SELECT * FROM dose_schedules WHERE patientId = :patientId ORDER BY time ASC")
+    suspend fun getSchedulesForPatient(patientId: Long): List<DoseSchedule>
+
     @Query("SELECT * FROM dose_schedules WHERE medicationId = :medicationId ORDER BY time ASC")
     suspend fun getSchedulesForMedication(medicationId: Long): List<DoseSchedule>
+
+    @Query("SELECT * FROM dose_schedules WHERE medicationId = :medicationId AND patientId = :patientId ORDER BY time ASC")
+    suspend fun getSchedulesForMedicationForPatient(medicationId: Long, patientId: Long): List<DoseSchedule>
 }

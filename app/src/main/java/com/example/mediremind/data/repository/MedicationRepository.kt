@@ -11,8 +11,16 @@ class MedicationRepository(context: Context) {
         return medicationDao.getAllMedications()
     }
 
+    suspend fun getMedicationsForPatient(patientId: Long): List<Medication> {
+        return medicationDao.getMedicationsForPatient(patientId)
+    }
+
     suspend fun getMedicationById(id: Long): Medication? {
         return medicationDao.getMedicationById(id)
+    }
+
+    suspend fun getMedicationByIdForPatient(id: Long, patientId: Long): Medication? {
+        return medicationDao.getMedicationByIdForPatient(id, patientId)
     }
 
     suspend fun insertMedication(medication: Medication): Long {

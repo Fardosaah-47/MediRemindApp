@@ -22,6 +22,12 @@ interface MedicationDao {
     @Query("SELECT * FROM medications ORDER BY name ASC")
     suspend fun getAllMedications(): List<Medication>
 
+    @Query("SELECT * FROM medications WHERE patientId = :patientId ORDER BY name ASC")
+    suspend fun getMedicationsForPatient(patientId: Long): List<Medication>
+
     @Query("SELECT * FROM medications WHERE id = :id")
     suspend fun getMedicationById(id: Long): Medication?
+
+    @Query("SELECT * FROM medications WHERE id = :id AND patientId = :patientId")
+    suspend fun getMedicationByIdForPatient(id: Long, patientId: Long): Medication?
 }

@@ -1,0 +1,19 @@
+{
+  "type": "mediremind_rx_v1",
+  "source": "MediRemind Demo Pharmacy",
+  "medications": [
+    {
+      "name": "Metformin",
+      "form": "TABLET",
+      "dosage": "500mg tablet - take one tablet twice daily with meals",
+      "frequency": "TWICE_DAILY",
+      "times": [
+        "08:00 AM",
+        "08:00 PM"
+      ],
+      "stockAmount": 60,
+      "stockUnit": "tablets",
+      "refillAlertAt": 10
+    }
+  ]
+}

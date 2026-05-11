@@ -1,0 +1,18 @@
+{
+  "type": "mediremind_rx_v1",
+  "source": "MediRemind Demo Pharmacy",
+  "medications": [
+    {
+      "name": "Amlodipine",
+      "form": "TABLET",
+      "dosage": "5mg tablet - take one tablet once daily in the morning",
+      "frequency": "ONCE_DAILY",
+      "times": [
+        "09:00 AM"
+      ],
+      "stockAmount": 30,
+      "stockUnit": "tablets",
+      "refillAlertAt": 7
+    }
+  ]
+}
