@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,15 +25,21 @@ import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.LocalPharmacy
 import androidx.compose.material.icons.outlined.MedicalServices
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -48,19 +55,30 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.mediremind.ui.theme.MediAmber
+import com.example.mediremind.ui.theme.MediBorder
+import com.example.mediremind.ui.theme.MediCoral
+import com.example.mediremind.ui.theme.MediCream
+import com.example.mediremind.ui.theme.MediGreen
+import com.example.mediremind.ui.theme.MediInk
+import com.example.mediremind.ui.theme.MediMint
+import com.example.mediremind.ui.theme.MediMuted
+import com.example.mediremind.ui.theme.MediSurfaceRaised
+import com.example.mediremind.ui.theme.MediTeal
+import com.example.mediremind.ui.theme.MediTealDark
 import com.example.mediremind.ui.theme.MediRemindTheme
 
-private val HomeCream = Color(0xFFF5F1FF)
-private val HomeCard = Color(0xFFFFFFFF)
-private val HomeInk = Color(0xFF2F2854)
-private val HomeMuted = Color(0xFF7E75A3)
-private val HomeBrown = Color(0xFFCFC3FF)
-private val HomeBrownDark = Color(0xFF6D57D9)
-private val HomeNavy = Color(0xFF1F2850)
-private val HomePill = Color(0xFFEDE7FF)
-private val HomeMedical = Color(0xFF7B61FF)
-private val HomeSuccess = Color(0xFF2F8F6B)
-private val HomePink = Color(0xFFF06BA3)
+private val HomeCream = MediCream
+private val HomeCard = MediSurfaceRaised
+private val HomeInk = MediInk
+private val HomeMuted = MediMuted
+private val HomeBrown = MediTealDark
+private val HomeBrownDark = MediTeal
+private val HomePill = MediMint
+private val HomeMedical = MediTeal
+private val HomeSuccess = MediGreen
+private val HomePink = MediAmber
+private val HomeWarning = MediCoral
 
 @Composable
 fun HomeScreen(
@@ -70,6 +88,7 @@ fun HomeScreen(
     scheduleCount: Int = 0,
     dueTodayCount: Int = 0,
     loggedTodayCount: Int = 0,
+    missedTodayCount: Int = 0,
     nextStepLabel: String = "Set up the patient profile first.",
     onStartMedicationFlow: () -> Unit = {},
     onStartScheduleFlow: () -> Unit = {},
@@ -81,21 +100,17 @@ fun HomeScreen(
 ) {
     val displayName = patientName?.takeIf { it.isNotBlank() } ?: "Patient"
     val hasDoseToday = dueTodayCount > 0
-    val remainingDoses = (dueTodayCount - loggedTodayCount).coerceAtLeast(0)
-    val nextMedicineTitle = when {
-        !patientName.isNullOrBlank() && hasDoseToday -> "Next medicine"
-        !patientName.isNullOrBlank() -> "No dose due"
-        else -> "Set up first"
+    val pendingTodayCount = (dueTodayCount - loggedTodayCount - missedTodayCount).coerceAtLeast(0)
+    val handledTodayCount = (loggedTodayCount + missedTodayCount).coerceAtMost(dueTodayCount)
+    val dayProgressPercent = if (dueTodayCount > 0) {
+        ((handledTodayCount.toFloat() / dueTodayCount.toFloat()) * 100).toInt()
+    } else {
+        0
     }
-    val nextMedicineName = when {
-        !patientName.isNullOrBlank() && hasDoseToday -> "Open Dose Log"
-        !patientName.isNullOrBlank() -> "All clear"
-        else -> "Create profile"
-    }
-    val nextMedicineTime = when {
-        !patientName.isNullOrBlank() && hasDoseToday -> "$remainingDoses left"
-        !patientName.isNullOrBlank() -> "Today"
-        else -> "Start"
+    val streakLabel = if (dueTodayCount > 0 && pendingTodayCount == 0 && missedTodayCount == 0) {
+        "1 day"
+    } else {
+        "0 days"
     }
 
     Box(
@@ -111,18 +126,20 @@ fun HomeScreen(
             item {
                 HomeTopBar(
                     patientName = displayName,
+                    onSearchClick = onStartMedicationFlow,
+                    onAlarmClick = onStartScheduleFlow,
                     onProfileClick = onStartProfileFlow
                 )
             }
 
             item {
-                NextDoseHero(
-                    title = nextMedicineTitle,
-                    medicineName = nextMedicineName,
-                    timeLabel = nextMedicineTime,
-                    actionLabel = if (patientName.isNullOrBlank()) "Profile" else "Log dose",
-                    actionIcon = if (patientName.isNullOrBlank()) Icons.Outlined.AccountCircle else Icons.Outlined.CheckCircle,
-                    onActionClick = if (patientName.isNullOrBlank()) onStartProfileFlow else onStartDoseLoggingFlow
+                DailyProgressHero(
+                    progressPercent = dayProgressPercent,
+                    handledCount = handledTodayCount,
+                    dueTodayCount = dueTodayCount,
+                    pendingTodayCount = pendingTodayCount,
+                    missedTodayCount = missedTodayCount,
+                    streakLabel = streakLabel
                 )
             }
 
@@ -130,6 +147,7 @@ fun HomeScreen(
                 TodayScheduleSection(
                     dueTodayCount = dueTodayCount,
                     loggedTodayCount = loggedTodayCount,
+                    missedTodayCount = missedTodayCount,
                     onDoseLogClick = onStartDoseLoggingFlow
                 )
             }
@@ -168,6 +186,8 @@ fun HomeScreen(
 @Composable
 private fun HomeTopBar(
     patientName: String,
+    onSearchClick: () -> Unit,
+    onAlarmClick: () -> Unit,
     onProfileClick: () -> Unit
 ) {
     Row(
@@ -193,20 +213,192 @@ private fun HomeTopBar(
             )
         }
 
-        Surface(
-            onClick = onProfileClick,
-            shape = CircleShape,
-            color = HomeCard,
-            tonalElevation = 0.dp,
-            shadowElevation = 1.dp,
-            modifier = Modifier.size(44.dp)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            TopShortcutButton(
+                icon = Icons.Outlined.Search,
+                contentDescription = "Search medicines",
+                onClick = onSearchClick
+            )
+            TopShortcutButton(
+                icon = Icons.Outlined.Notifications,
+                contentDescription = "Alarms",
+                onClick = onAlarmClick
+            )
+            TopShortcutButton(
+                icon = Icons.Outlined.AccountCircle,
+                contentDescription = "Profile",
+                onClick = onProfileClick
+            )
+        }
+    }
+}
+
+@Composable
+private fun TopShortcutButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = HomeCard,
+        tonalElevation = 0.dp,
+        shadowElevation = 1.dp,
+        modifier = Modifier.size(40.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = HomeBrownDark,
+                modifier = Modifier.size(23.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun DailyProgressHero(
+    progressPercent: Int,
+    handledCount: Int,
+    dueTodayCount: Int,
+    pendingTodayCount: Int,
+    missedTodayCount: Int,
+    streakLabel: String
+) {
+    val progressColor = if (missedTodayCount > 0) HomeWarning else HomePink
+    val progressFraction = (progressPercent / 100f).coerceIn(0f, 1f)
+    val statusLabel = when {
+        dueTodayCount == 0 -> "No doses today"
+        missedTodayCount > 0 -> "$missedTodayCount missed dose"
+        pendingTodayCount == 0 -> "All done"
+        else -> "$pendingTodayCount pending"
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = HomeBrownDark),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(222.dp)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color(0xFF1F7A8C), Color(0xFF145A68))
+                    )
+                )
+                .padding(24.dp)
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Outlined.AccountCircle,
-                    contentDescription = "Profile",
-                    tint = HomeBrownDark,
-                    modifier = Modifier.size(28.dp)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = (-18).dp, y = (-4).dp)
+                    .size(width = 78.dp, height = 30.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color(0xFFFFF8EE))
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = (-57).dp, y = (-4).dp)
+                    .size(width = 39.dp, height = 30.dp)
+                    .clip(RoundedCornerShape(topStart = 50.dp, bottomStart = 50.dp))
+                    .background(HomeWarning)
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .offset(x = (-88).dp, y = 4.dp)
+                    .size(12.dp)
+                    .clip(CircleShape)
+                    .background(HomeWarning)
+            )
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(y = 44.dp)
+                    .size(104.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    progress = { progressFraction },
+                    modifier = Modifier.size(94.dp),
+                    color = progressColor,
+                    trackColor = Color.White.copy(alpha = 0.72f),
+                    strokeWidth = 10.dp
+                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "$progressPercent%",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
+                        )
+                    )
+                    Text(
+                        text = "today",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White.copy(alpha = 0.86f)
+                        )
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(end = 116.dp)
+            ) {
+                Text(
+                    text = "Your Progress",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White.copy(alpha = 0.84f)
+                    )
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = statusLabel,
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    ),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "$handledCount of $dueTodayCount handled",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White.copy(alpha = 0.86f)
+                    )
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(end = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ProgressMiniChip(
+                    label = "Left",
+                    value = pendingTodayCount.toString(),
+                    color = HomeBrownDark,
+                    icon = Icons.Outlined.Schedule
+                )
+                ProgressMiniChip(
+                    label = "Streak",
+                    value = streakLabel,
+                    color = HomePink,
+                    icon = Icons.Outlined.LocalFireDepartment
                 )
             }
         }
@@ -214,90 +406,46 @@ private fun HomeTopBar(
 }
 
 @Composable
-private fun NextDoseHero(
-    title: String,
-    medicineName: String,
-    timeLabel: String,
-    actionLabel: String,
-    actionIcon: ImageVector,
-    onActionClick: () -> Unit
+private fun ProgressMiniChip(
+    label: String,
+    value: String,
+    color: Color,
+    icon: ImageVector
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = HomeBrown),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = Color.White.copy(alpha = 0.9f)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(178.dp)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color(0xFFD9D0FF), Color(0xFF9E8CF2))
-                    )
-                )
-                .padding(24.dp)
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            MedicineIllustration(
-                modifier = Modifier.align(Alignment.TopEnd)
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(20.dp)
             )
-
-            Column(
-                modifier = Modifier.align(Alignment.CenterStart)
-            ) {
+            Column {
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.Medium,
-                        color = Color.White.copy(alpha = 0.94f)
-                    )
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = medicineName,
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
+                    text = value,
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        color = HomeInk
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = timeLabel,
-                    style = MaterialTheme.typography.titleMedium.copy(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium.copy(
                         fontWeight = FontWeight.Bold,
-                    color = Color(0xFFFFF3E5)
-                    )
+                        color = HomeInk
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(18.dp))
-                Surface(
-                    onClick = onActionClick,
-                    shape = RoundedCornerShape(50),
-                    color = Color.White,
-                    modifier = Modifier.height(42.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 18.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Icon(
-                            imageVector = actionIcon,
-                            contentDescription = actionLabel,
-                            tint = HomeBrownDark,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Text(
-                            text = actionLabel,
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = HomeBrownDark
-                            )
-                        )
-                    }
-                }
             }
         }
     }
@@ -313,7 +461,7 @@ private fun MedicineIllustration(modifier: Modifier = Modifier) {
                 .size(width = 78.dp, height = 34.dp)
                 .align(Alignment.TopStart)
                 .clip(RoundedCornerShape(50))
-                .background(Color(0xFFFFF7EC))
+                .background(Color(0xFFFFF3DC))
         )
         Box(
             modifier = Modifier
@@ -327,14 +475,14 @@ private fun MedicineIllustration(modifier: Modifier = Modifier) {
                 .size(52.dp)
                 .align(Alignment.BottomEnd)
                 .clip(CircleShape)
-                .background(Color(0xFFFFF7EC))
+                .background(Color(0xFFFFF3DC))
         ) {
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .size(width = 32.dp, height = 4.dp)
                     .clip(RoundedCornerShape(50))
-                    .background(Color(0xFFD8B45E))
+                    .background(HomePink)
             )
         }
         Box(
@@ -351,8 +499,11 @@ private fun MedicineIllustration(modifier: Modifier = Modifier) {
 private fun TodayScheduleSection(
     dueTodayCount: Int,
     loggedTodayCount: Int,
+    missedTodayCount: Int,
     onDoseLogClick: () -> Unit
 ) {
+    val pendingTodayCount = (dueTodayCount - loggedTodayCount - missedTodayCount).coerceAtLeast(0)
+
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -367,7 +518,7 @@ private fun TodayScheduleSection(
                 modifier = Modifier.weight(1f)
             )
             Text(
-                text = if (dueTodayCount > 0) "$dueTodayCount due" else "No due",
+                text = if (dueTodayCount > 0) "$pendingTodayCount left" else "No due",
                 style = MaterialTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.SemiBold,
                     color = HomeMuted
@@ -393,9 +544,19 @@ private fun TodayScheduleSection(
                 iconTint = HomeSuccess,
                 onClick = onDoseLogClick
             )
+            if (missedTodayCount > 0) {
+                DosePreviewCard(
+                    title = "Missed",
+                    subtitle = "$missedTodayCount closed today",
+                    trailing = "Review",
+                    icon = Icons.Outlined.Close,
+                    iconTint = HomeWarning,
+                    onClick = onDoseLogClick
+                )
+            }
             DosePreviewCard(
                 title = "Remaining",
-                subtitle = "${(dueTodayCount - loggedTodayCount).coerceAtLeast(0)} left today",
+                subtitle = "$pendingTodayCount left today",
                 trailing = "Dose Log",
                 icon = Icons.Outlined.Schedule,
                 iconTint = HomeMedical,
@@ -535,47 +696,57 @@ private fun SetupActionCard(
         modifier = modifier.height(92.dp),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.elevatedCardColors(
-            containerColor = if (highlight) Color(0xFFFFF7EC) else HomeCard
+            containerColor = if (highlight) Color(0xFFFFF5E3) else HomeCard
         ),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             Box(
                 modifier = Modifier
-                    .size(42.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0xFFEFE0D3)),
-                contentAlignment = Alignment.Center
+                    .align(Alignment.TopEnd)
+                    .offset(x = 24.dp, y = (-26).dp)
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background((if (highlight) HomePink else HomeMedical).copy(alpha = 0.12f))
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = HomeMedical,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = HomeInk
-                    ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = detail,
-                    style = MaterialTheme.typography.bodySmall.copy(color = HomeMuted),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(if (highlight) Color(0xFFFFE2AD) else HomePill),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = label,
+                        tint = if (highlight) HomeInk else HomeMedical,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            color = HomeInk
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = detail,
+                        style = MaterialTheme.typography.bodySmall.copy(color = HomeMuted),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }
@@ -635,23 +806,28 @@ private fun HomeBottomBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color.Transparent)
+            .background(HomeCard)
             .navigationBarsPadding()
-            .padding(start = 18.dp, end = 18.dp, bottom = 12.dp)
     ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(MediBorder)
+        )
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(86.dp),
-            shape = RoundedCornerShape(30.dp),
+                .height(80.dp),
+            shape = RoundedCornerShape(0.dp),
             color = HomeCard,
-            shadowElevation = 8.dp,
+            shadowElevation = 0.dp,
             tonalElevation = 0.dp
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -702,7 +878,7 @@ private fun BottomNavItem(
 ) {
     Surface(
         onClick = onClick,
-        modifier = modifier.height(68.dp),
+        modifier = modifier.height(64.dp),
         color = Color.Transparent,
         shape = RoundedCornerShape(22.dp)
     ) {
@@ -713,7 +889,7 @@ private fun BottomNavItem(
             Box(
                 modifier = Modifier
                     .size(36.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(CircleShape)
                     .background(if (selected) HomePill else Color.Transparent),
                 contentAlignment = Alignment.Center
             ) {
@@ -743,7 +919,7 @@ private fun DoseNavItem(
 ) {
     Surface(
         onClick = onClick,
-        modifier = modifier.height(70.dp),
+        modifier = modifier.height(66.dp),
         color = Color.Transparent,
         shape = RoundedCornerShape(22.dp)
     ) {
@@ -753,9 +929,9 @@ private fun DoseNavItem(
         ) {
             Box(
                 modifier = Modifier
-                    .size(50.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(HomeNavy),
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(HomeBrownDark),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -769,7 +945,7 @@ private fun DoseNavItem(
                 text = "Dose",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
-                color = HomeNavy,
+                color = HomeInk,
                 maxLines = 1
             )
         }

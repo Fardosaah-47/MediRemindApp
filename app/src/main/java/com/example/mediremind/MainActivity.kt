@@ -1,7 +1,9 @@
 package com.example.mediremind
 
+import android.Manifest
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -35,6 +37,8 @@ import com.example.mediremind.data.repository.MedicationRepository
 import com.example.mediremind.data.repository.QrImportResult
 import com.example.mediremind.data.repository.QrImportParser
 import com.example.mediremind.data.repository.UserProfileRepository
+import com.example.mediremind.domain.EXTRA_OPEN_DOSE_LOG
+import com.example.mediremind.domain.MedicationAlarmScheduler
 import com.example.mediremind.domain.MedicationPhotoMatcher
 import com.example.mediremind.ui.screen.home.HomeScreen
 import com.example.mediremind.ui.screen.medication.MedicationFormScreen
@@ -103,7 +107,14 @@ class MainActivity : ComponentActivity() {
             val doseLogRepository = remember { DoseLogRepository(applicationContext) }
             val userProfileRepository = remember { UserProfileRepository(applicationContext) }
 
-            var currentScreen by remember { mutableStateOf(AppScreen.HOME) }
+            val initialScreen = remember {
+                if (intent?.getBooleanExtra(EXTRA_OPEN_DOSE_LOG, false) == true) {
+                    AppScreen.DOSE_LOGGING
+                } else {
+                    AppScreen.HOME
+                }
+            }
+            var currentScreen by remember { mutableStateOf(initialScreen) }
             var medications by remember { mutableStateOf<List<Medication>>(emptyList()) }
             var schedules by remember { mutableStateOf<List<DoseSchedule>>(emptyList()) }
             var doseLogs by remember { mutableStateOf<List<DoseLog>>(emptyList()) }
@@ -135,8 +146,16 @@ class MainActivity : ComponentActivity() {
             var timeRefreshKey by remember { mutableStateOf(currentMinuteRefreshKey()) }
 
             val coroutineScope = rememberCoroutineScope()
+            val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.RequestPermission()
+            ) {
+                // The reminder scheduler checks permission again before posting.
+            }
 
             LaunchedEffect(Unit) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
                 cleanupExpiredVerificationPhotos(
                     context = applicationContext,
                     doseLogRepository = doseLogRepository
@@ -377,6 +396,11 @@ class MainActivity : ComponentActivity() {
                                 }
                                 medications = medicationRepository.getMedicationsForPatient(patientId)
                                 schedules = doseScheduleRepository.getSchedulesForPatient(patientId)
+                                scheduleActiveMedicationAlarms(
+                                    context = applicationContext,
+                                    schedules = schedules,
+                                    medications = medications
+                                )
                                 selectedMedication = null
                                 medicationReferenceImageUri = null
                                 currentScreen = AppScreen.MEDICATION_LIST
@@ -384,6 +408,14 @@ class MainActivity : ComponentActivity() {
                         },
                         onDeleteMedication = { medication ->
                             coroutineScope.launch {
+                                schedules
+                                    .filter { schedule -> schedule.medicationId == medication.id }
+                                    .forEach { schedule ->
+                                        MedicationAlarmScheduler.cancelAlarm(
+                                            context = applicationContext,
+                                            scheduleId = schedule.id
+                                        )
+                                    }
                                 medication.referenceImageUri?.let { imageUri ->
                                     applicationContext.contentResolver.delete(
                                         Uri.parse(imageUri),
@@ -410,11 +442,25 @@ class MainActivity : ComponentActivity() {
                                     schedule.copy(patientId = activePatientId)
                                 }
                                 if (selectedSchedule != null && newSchedules.size == 1) {
-                                    doseScheduleRepository.updateDoseSchedule(schedulesToSave.first())
+                                    val updatedSchedule = schedulesToSave.first()
+                                    doseScheduleRepository.updateDoseSchedule(updatedSchedule)
+                                    if (selectedSchedule?.time != updatedSchedule.time) {
+                                        clearTodayAutoMissForEditedSchedule(
+                                            scheduleId = updatedSchedule.id,
+                                            patientId = activePatientId,
+                                            doseLogRepository = doseLogRepository
+                                        )
+                                    }
                                 } else {
                                     doseScheduleRepository.insertDoseSchedules(schedulesToSave)
                                 }
                                 schedules = doseScheduleRepository.getSchedulesForPatient(activePatientId)
+                                doseLogs = doseLogRepository.getLogsForPatient(activePatientId)
+                                scheduleActiveMedicationAlarms(
+                                    context = applicationContext,
+                                    schedules = schedules,
+                                    medications = medications
+                                )
                                 selectedSchedule = null
                                 currentScreen = AppScreen.SCHEDULE_LIST
                             }
@@ -616,6 +662,11 @@ class MainActivity : ComponentActivity() {
                                             )
                                             medications = medicationRepository.getMedicationsForPatient(activePatientId)
                                             schedules = doseScheduleRepository.getSchedulesForPatient(activePatientId)
+                                            scheduleActiveMedicationAlarms(
+                                                context = applicationContext,
+                                                schedules = schedules,
+                                                medications = medications
+                                            )
                                             if (importResult.insertedMedicationIds.size == 1) {
                                                 val importedMedication = medications.firstOrNull {
                                                     it.id == importResult.insertedMedicationIds.first()
@@ -759,6 +810,9 @@ private fun AppContent(
             val loggedTodayCount = doseLogs.count { log ->
                 log.logDate == todayDate && log.status != DoseStatus.MISSED
             }
+            val missedTodayCount = doseLogs.count { log ->
+                log.logDate == todayDate && log.status == DoseStatus.MISSED
+            }
             val nextStepLabel = when {
                 userProfile == null -> "Save the patient profile first so reports and caregiver sharing use the right patient name."
                 medications.isEmpty() -> "Add the patient's medicines next so MediRemind can start tracking treatment."
@@ -773,6 +827,7 @@ private fun AppContent(
                 scheduleCount = schedules.size,
                 dueTodayCount = dueTodayCount,
                 loggedTodayCount = loggedTodayCount,
+                missedTodayCount = missedTodayCount,
                 nextStepLabel = nextStepLabel,
                 onStartMedicationFlow = onStartMedicationFlow,
                 onStartScheduleFlow = onStartScheduleFlow,
@@ -1599,6 +1654,57 @@ private suspend fun cleanupExpiredVerificationPhotos(
             if (shouldClearPhotoReference) {
                 doseLogRepository.updateDoseLog(log.copy(imageUri = null))
             }
+        }
+}
+
+private fun scheduleActiveMedicationAlarms(
+    context: Context,
+    schedules: List<DoseSchedule>,
+    medications: List<Medication>
+) {
+    val todayDate = currentDateOnly()
+    val medicationNameById = medications.associate { medication ->
+        medication.id to medication.name
+    }
+
+    schedules
+        .filter { schedule ->
+            schedule.id != 0L &&
+                schedule.frequency != com.example.mediremind.data.model.DoseFrequency.AS_NEEDED &&
+                isScheduleActiveOnOrAfterToday(
+                    schedule = schedule,
+                    todayDate = todayDate
+                )
+        }
+        .forEach { schedule ->
+            MedicationAlarmScheduler.scheduleAlarm(
+                context = context,
+                scheduleId = schedule.id,
+                medicationName = medicationNameById[schedule.medicationId] ?: "Medication",
+                timeString = schedule.time,
+                frequencyName = schedule.frequency.name,
+                startDate = schedule.startDate,
+                endDate = schedule.endDate
+            )
+        }
+}
+
+private suspend fun clearTodayAutoMissForEditedSchedule(
+    scheduleId: Long,
+    patientId: Long,
+    doseLogRepository: DoseLogRepository
+) {
+    val todayDate = currentDateOnly()
+    doseLogRepository.getLogsForPatient(patientId)
+        .filter { log ->
+            log.doseScheduleId == scheduleId &&
+                log.logDate == todayDate &&
+                log.status == DoseStatus.MISSED &&
+                log.takenAt == null &&
+                log.imageUri.isNullOrBlank()
+        }
+        .forEach { log ->
+            doseLogRepository.deleteDoseLog(log)
         }
 }
 

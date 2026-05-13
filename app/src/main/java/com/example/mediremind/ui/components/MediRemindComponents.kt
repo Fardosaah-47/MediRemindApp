@@ -32,6 +32,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.mediremind.ui.theme.AppAlertSoft
+import com.example.mediremind.ui.theme.AppBorder
+import com.example.mediremind.ui.theme.AppPrimarySoft
+import com.example.mediremind.ui.theme.AppSecondaryText
+import com.example.mediremind.ui.theme.AppText
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,7 +49,7 @@ fun MediRemindTopBar(
         title = {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold)
             )
         },
         navigationIcon = {
@@ -57,7 +62,7 @@ fun MediRemindTopBar(
         },
         actions = { actions() },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.background,
             titleContentColor = MaterialTheme.colorScheme.onSurface,
             navigationIconContentColor = MaterialTheme.colorScheme.onSurface
         )
@@ -72,10 +77,10 @@ fun SectionLabel(
     Text(
         text = text,
         style = MaterialTheme.typography.labelMedium.copy(
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.ExtraBold,
             letterSpacing = 0.8.sp
         ),
-        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
+        color = AppSecondaryText,
         modifier = modifier
     )
 }
@@ -93,11 +98,11 @@ fun InfoCard(
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = containerColor)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(18.dp)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = contentColor.copy(alpha = 0.7f)
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold),
+                color = contentColor
             )
             Spacer(modifier = Modifier.height(8.dp))
             content()
@@ -116,7 +121,7 @@ fun SurfaceCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(18.dp)) {
             content()
         }
     }
@@ -126,8 +131,8 @@ fun SurfaceCard(
 fun StatusChip(
     label: String,
     modifier: Modifier = Modifier,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
-    contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant
+    containerColor: Color = AppPrimarySoft,
+    contentColor: Color = MaterialTheme.colorScheme.primary
 ) {
     Surface(
         color = containerColor,
@@ -136,9 +141,9 @@ fun StatusChip(
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.ExtraBold),
             color = contentColor,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
         )
     }
 }
@@ -148,7 +153,7 @@ fun IconBadge(
     icon: ImageVector,
     modifier: Modifier = Modifier,
     tint: Color = MaterialTheme.colorScheme.primary,
-    background: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+    background: Color = AppPrimarySoft,
     size: Int = 40
 ) {
     Box(

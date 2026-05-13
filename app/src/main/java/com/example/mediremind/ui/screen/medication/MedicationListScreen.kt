@@ -4,12 +4,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,17 +23,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForwardIos
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.LocalPharmacy
-import androidx.compose.material.icons.outlined.Medication
 import androidx.compose.material.icons.outlined.QrCode
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -40,12 +42,24 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
 import com.example.mediremind.data.model.Medication
 import com.example.mediremind.data.model.MedicationForm
 import com.example.mediremind.ui.components.MediRemindTopBar
+import com.example.mediremind.ui.theme.MediAmber
+import com.example.mediremind.ui.theme.MediBlue
+import com.example.mediremind.ui.theme.MediCoral
+import com.example.mediremind.ui.theme.MediGreen
+import com.example.mediremind.ui.theme.MediInk
+import com.example.mediremind.ui.theme.MediMint
+import com.example.mediremind.ui.theme.MediMuted
+import com.example.mediremind.ui.theme.MediPurple
+import com.example.mediremind.ui.theme.MediSurfaceRaised
+import com.example.mediremind.ui.theme.MediTeal
 import com.example.mediremind.ui.theme.MediRemindTheme
 
 @Composable
@@ -64,7 +78,11 @@ fun MedicationListScreen(
             Button(
                 onClick = onAddMedicationClick,
                 shape = RoundedCornerShape(16.dp),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp)
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MediAmber,
+                    contentColor = MediInk
+                )
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Add,
@@ -95,13 +113,16 @@ fun MedicationListScreen(
                     top = 16.dp,
                     bottom = 100.dp
                 ),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 item {
                     Text(
-                        text = "${medications.size} medication${if (medications.size != 1) "s" else ""} saved",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                        text = "MEDICATIONS - ${medications.size} SAVED",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 1.2.sp
+                        ),
+                        color = MediTeal
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                 }
@@ -128,70 +149,137 @@ private fun MedicationCard(
     }
     val isLowStock = medication.currentStockAmount <= medication.refillAlertAt
     val formColor = formColor(medication.form)
+    val formLabel = medication.form.name.lowercase().replaceFirstChar { it.uppercase() }
+    val initials = medication.name
+        .split(" ")
+        .take(2)
+        .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+        .joinToString("")
+        .ifBlank { "Rx" }
 
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(24.dp),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.elevatedCardColors(containerColor = MediSurfaceRaised)
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(46.dp)
-                    .background(
-                        color = formColor.copy(alpha = 0.14f),
-                        shape = RoundedCornerShape(14.dp)
-                    ),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .height(128.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(formColor.copy(alpha = 0.10f))
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Medication,
-                    contentDescription = null,
-                    tint = formColor,
-                    modifier = Modifier.size(24.dp)
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 24.dp, y = (-28).dp)
+                        .size(118.dp)
+                        .clip(CircleShape)
+                        .background(formColor.copy(alpha = 0.14f))
                 )
-            }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .offset(x = (-24).dp, y = 30.dp)
+                        .size(96.dp)
+                        .clip(CircleShape)
+                        .background(MediAmber.copy(alpha = 0.14f))
+                )
 
-            androidx.compose.foundation.layout.Column(modifier = Modifier.weight(1f)) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = medication.name,
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.onSurface
+                    Pill(
+                        label = formLabel,
+                        containerColor = Color.White.copy(alpha = 0.84f),
+                        contentColor = formColor
                     )
-                    if (medication.isQrImported) {
-                        Icon(
-                            imageVector = Icons.Outlined.QrCode,
-                            contentDescription = "QR Imported",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(14.dp)
+                    if (isLowStock) {
+                        Pill(
+                            label = "Low stock",
+                            containerColor = MediCoral.copy(alpha = 0.14f),
+                            contentColor = MediCoral
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "${medication.form.name.lowercase().replaceFirstChar { it.uppercase() }} · ${medication.dosage}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(MediAmber),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = initials,
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold),
+                            color = MediInk
+                        )
+                    }
+                    Text(
+                        text = if (medication.isQrImported) "QR imported" else "Manual entry",
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold),
+                        color = MediInk,
+                        maxLines = 1
+                    )
+                }
+            }
 
-                Spacer(modifier = Modifier.height(8.dp))
+            Column(
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = medication.name,
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                            color = MediInk,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = medication.dosage,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MediMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Pill(
+                        label = "${medication.currentStockAmount.toInt()} ${medication.stockUnit}",
+                        containerColor = if (isLowStock) MediCoral.copy(alpha = 0.14f) else MediGreen.copy(alpha = 0.12f),
+                        contentColor = if (isLowStock) MediCoral else MediGreen
+                    )
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     LinearProgressIndicator(
                         progress = { stockFraction },
@@ -199,51 +287,64 @@ private fun MedicationCard(
                             .weight(1f)
                             .height(5.dp)
                             .clip(CircleShape),
-                        color = if (isLowStock) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        color = if (isLowStock) MediCoral else MediTeal,
+                        trackColor = MediMint,
                         strokeCap = StrokeCap.Round
                     )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                    ) {
-                        if (isLowStock) {
-                            Icon(
-                                imageVector = Icons.Outlined.Warning,
-                                contentDescription = "Low stock",
-                                tint = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.size(12.dp)
-                            )
-                        }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "${medication.currentStockAmount.toInt()} ${medication.stockUnit}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isLowStock) {
-                                MaterialTheme.colorScheme.tertiary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
+                            text = "View",
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold),
+                            color = formColor
+                        )
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.ArrowForwardIos,
+                            contentDescription = null,
+                            tint = formColor,
+                            modifier = Modifier.size(13.dp)
                         )
                     }
                 }
 
                 if (medication.referenceImageUri.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Reference photo needed",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.tertiary
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Warning,
+                            contentDescription = null,
+                            tint = MediCoral,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "Reference photo needed",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MediCoral
+                        )
+                    }
                 }
             }
-
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.ArrowForwardIos,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                modifier = Modifier.size(14.dp)
-            )
         }
+    }
+}
+
+@Composable
+private fun Pill(
+    label: String,
+    containerColor: Color,
+    contentColor: Color
+) {
+    Surface(
+        color = containerColor,
+        shape = RoundedCornerShape(50)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.ExtraBold),
+            color = contentColor,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+        )
     }
 }
 
@@ -251,7 +352,7 @@ private fun MedicationCard(
 private fun EmptyMedicationsState(
     modifier: Modifier = Modifier
 ) {
-    androidx.compose.foundation.layout.Column(
+    Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -291,11 +392,11 @@ private fun EmptyMedicationsState(
 @Composable
 private fun formColor(form: MedicationForm): Color {
     return when (form) {
-        MedicationForm.TABLET -> MaterialTheme.colorScheme.primary
-        MedicationForm.CAPSULE -> Color(0xFF7E57C2)
-        MedicationForm.LIQUID -> Color(0xFF0288D1)
-        MedicationForm.INJECTION -> MaterialTheme.colorScheme.tertiary
-        MedicationForm.OTHER -> Color(0xFF78909C)
+        MedicationForm.TABLET -> MediTeal
+        MedicationForm.CAPSULE -> MediPurple
+        MedicationForm.LIQUID -> MediBlue
+        MedicationForm.INJECTION -> MediCoral
+        MedicationForm.OTHER -> MediMuted
     }
 }
 

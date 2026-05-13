@@ -22,4 +22,8 @@ class DoseLogRepository(context: Context) {
     suspend fun updateDoseLog(doseLog: DoseLog) {
         doseLogDao.updateDoseLog(doseLog)
     }
+
+    suspend fun deleteDoseLog(doseLog: DoseLog) {
+        doseLogDao.deleteDoseLog(doseLog)
+    }
 }

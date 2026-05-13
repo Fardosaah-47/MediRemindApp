@@ -43,11 +43,23 @@ Implemented major areas:
 
 Not fully implemented yet:
 
-- real Android reminder engine with `AlarmManager`
-- notification channel and reminder receiver
 - timed refill notifications
-- 24-hour cleanup of verification photos
 - release APK / final documentation screenshots
+
+Recently added but still needs real-device testing:
+
+- basic Android reminder engine with `AlarmManager`
+- notification channel and reminder receiver
+- boot receiver for rescheduling
+- runtime notification permission request
+- notification tap opens Dose Log
+
+Current UI warning:
+
+- the Home screen is still under active visual review
+- do not treat the current Home card styling as final
+- preserve logic/navigation while iterating visually
+- the user wants elderly-friendly, high-contrast, low-clutter UI
 
 ## Tech Stack
 
@@ -307,6 +319,10 @@ Recent refinement work includes:
 - improved home dashboard so it is not just random buttons
 - improved patient profile usage
 - improved patient report, caregiver scan, and QR import presentation
+- added basic `AlarmManager` reminder scheduler/receiver/boot receiver
+- added notification permission request
+- added schedule-edit cleanup so Dose Log reflects edited same-day times
+- added accessibility-oriented theme tokens, but final visual direction is still under review
 
 ## Current Strengths
 
@@ -319,56 +335,70 @@ Recent refinement work includes:
 
 ## Known Weaknesses / Gaps
 
-### 1. Reminder Engine Not Built Yet
+### 1. Reminder Engine Exists But Needs Real-Device Testing
+
+Implemented:
+
+- `MedicationAlarmScheduler`
+- `MedicationAlarmReceiver`
+- `MedicationBootReceiver`
+- manifest permissions for notifications, exact alarms, and boot
+- notification tap opens Dose Log
+- alarms are scheduled after medication/schedule/QR saves
 
 Still missing:
 
-- notification channel
-- runtime notification permission flow
-- `AlarmManager` scheduling
-- reminder receiver
-- real scheduled reminder firing
+- real-device verification that reminders fire reliably
+- sound/vibration/lock-screen behavior
+- refill reminder scheduling
+- decision on full-screen alarm screen
 
 ### 2. Refill Logic Needs Harder Coupling To Real Logs
 
-The app already estimates refill timing, but later it should rely even more strongly on actual taken-dose behavior instead of only static schedule math.
+The app decrements stock after a confirmed Taken dose. Later it should support dose amounts other than 1 unit and rely more strongly on actual taken-dose behavior for refill timing.
 
-### 3. Some Screens Still Need UX Tightening
+### 3. UI Is The Main Active Risk
 
-The app is improved, but a few screens still feel closer to tool pages than a final polished health app.
+The current UI is not final. The user is actively reviewing Home screen styling. Claude should improve visual clarity cautiously, one screen at a time, without changing navigation or logic.
 
-### 4. Photo Privacy Cleanup Still Missing
+Preferred design rules for the current pass:
 
-Proof photos are saved, but automatic 24-hour cleanup is not yet implemented.
+- background `#F7F9FB`
+- primary `#2F80ED`
+- success `#27AE60`
+- alert `#EB5757`
+- text `#222222`
+- icons plus text labels
+- large tap targets
+- high contrast
+- no color-only status meaning
+
+### 4. QR And Persona Testing Still Needed
+
+Need test passes for:
+
+- Mary Achieng: diabetic, twice daily
+- second patient: one daily blood pressure medicine
+- QR imported patient: medication loaded by scan
+- caregiver report scan flow
 
 ## Recommended Next Build Order
 
-### Before Reminder Engine
+### Immediate
 
-Do a short final refinement pass on:
+- real-device test current alarm notification behavior
+- finish Home screen visual approval
+- apply approved accessibility design to Dose Logging
+- test QR import with realistic payloads
 
-- medication screen flow consistency
-- schedule screen flow consistency
-- profile/report wording consistency
-- QR import review behavior
+### Next
 
-### After That
+- upgrade reminder sound/vibration
+- add refill reminders
+- refine caregiver report wording
 
-Build the real reminder system:
+### Later
 
-1. notification channel
-2. reminder permission
-3. reminder receiver
-4. `AlarmManager` scheduling
-5. refill reminder scheduling
-
-### After Reminders
-
-Finish:
-
-- photo cleanup after 24 hours
-- final caregiver report polish
-- real-device testing pass
 - release APK
 - report screenshots
 
@@ -397,6 +427,6 @@ MediRemind currently offers a real offline patient workflow:
 - generate caregiver QR summary
 - scan caregiver summary on another device
 
-The biggest missing engineering block is the actual Android reminder engine.
+The biggest engineering risk is now real-device reminder reliability, not the existence of the reminder engine.
 
-The biggest current design goal is to keep turning the working screens into a more guided, patient-friendly app flow without breaking the stable core already built.
+The biggest current design goal is to make the working screens elderly-friendly and visually coherent without breaking the stable core already built.

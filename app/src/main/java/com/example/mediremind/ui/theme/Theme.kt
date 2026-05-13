@@ -6,16 +6,20 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 
 private val LightColorScheme = lightColorScheme(
-    primary = ClinicTeal,
-    secondary = CalmMint,
-    tertiary = AlertCoral,
-    background = SoftGray,
-    surface = androidx.compose.ui.graphics.Color.White,
+    primary = AppPrimary,
+    secondary = AppPrimarySoft,
+    tertiary = AppAlert,
+    background = AppBackground,
+    surface = AppCard,
+    surfaceVariant = AppPrimarySoft,
+    error = AppAlert,
     onPrimary = androidx.compose.ui.graphics.Color.White,
-    onSecondary = Ink,
+    onSecondary = AppText,
     onTertiary = androidx.compose.ui.graphics.Color.White,
-    onBackground = Ink,
-    onSurface = Ink
+    onBackground = AppText,
+    onSurface = AppText,
+    onSurfaceVariant = AppSecondaryText,
+    onError = androidx.compose.ui.graphics.Color.White
 )
 
 private val DarkColorScheme = darkColorScheme(
