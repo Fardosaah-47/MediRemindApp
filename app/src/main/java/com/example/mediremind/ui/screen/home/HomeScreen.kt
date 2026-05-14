@@ -61,20 +61,21 @@ import com.example.mediremind.ui.theme.MediCoral
 import com.example.mediremind.ui.theme.MediCream
 import com.example.mediremind.ui.theme.MediGreen
 import com.example.mediremind.ui.theme.MediInk
-import com.example.mediremind.ui.theme.MediMint
 import com.example.mediremind.ui.theme.MediMuted
+import com.example.mediremind.ui.theme.MediPrimary
+import com.example.mediremind.ui.theme.MediPrimaryDark
+import com.example.mediremind.ui.theme.MediPrimaryLight
 import com.example.mediremind.ui.theme.MediSurfaceRaised
 import com.example.mediremind.ui.theme.MediTeal
-import com.example.mediremind.ui.theme.MediTealDark
 import com.example.mediremind.ui.theme.MediRemindTheme
 
 private val HomeCream = MediCream
 private val HomeCard = MediSurfaceRaised
 private val HomeInk = MediInk
 private val HomeMuted = MediMuted
-private val HomeBrown = MediTealDark
-private val HomeBrownDark = MediTeal
-private val HomePill = MediMint
+private val HomeBrown = MediPrimary
+private val HomeBrownDark = MediPrimaryDark
+private val HomePill = MediPrimaryLight
 private val HomeMedical = MediTeal
 private val HomeSuccess = MediGreen
 private val HomePink = MediAmber
@@ -88,6 +89,7 @@ fun HomeScreen(
     scheduleCount: Int = 0,
     dueTodayCount: Int = 0,
     loggedTodayCount: Int = 0,
+    takenTodayCount: Int = 0,
     missedTodayCount: Int = 0,
     nextStepLabel: String = "Set up the patient profile first.",
     onStartMedicationFlow: () -> Unit = {},
@@ -101,9 +103,8 @@ fun HomeScreen(
     val displayName = patientName?.takeIf { it.isNotBlank() } ?: "Patient"
     val hasDoseToday = dueTodayCount > 0
     val pendingTodayCount = (dueTodayCount - loggedTodayCount - missedTodayCount).coerceAtLeast(0)
-    val handledTodayCount = (loggedTodayCount + missedTodayCount).coerceAtMost(dueTodayCount)
     val dayProgressPercent = if (dueTodayCount > 0) {
-        ((handledTodayCount.toFloat() / dueTodayCount.toFloat()) * 100).toInt()
+        ((takenTodayCount.coerceAtMost(dueTodayCount).toFloat() / dueTodayCount.toFloat()) * 100).toInt()
     } else {
         0
     }
@@ -135,7 +136,7 @@ fun HomeScreen(
             item {
                 DailyProgressHero(
                     progressPercent = dayProgressPercent,
-                    handledCount = handledTodayCount,
+                    takenTodayCount = takenTodayCount,
                     dueTodayCount = dueTodayCount,
                     pendingTodayCount = pendingTodayCount,
                     missedTodayCount = missedTodayCount,
@@ -176,7 +177,7 @@ fun HomeScreen(
             modifier = Modifier.align(Alignment.BottomCenter),
             onHomeClick = {},
             onQrClick = onStartQrImportFlow,
-            onDoseClick = onStartDoseLoggingFlow,
+            onAddClick = onStartMedicationFlow,
             onReportClick = onStartPatientReportFlow,
             onMedicationClick = onStartMedicationFlow
         )
@@ -261,16 +262,17 @@ private fun TopShortcutButton(
 @Composable
 private fun DailyProgressHero(
     progressPercent: Int,
-    handledCount: Int,
+    takenTodayCount: Int,
     dueTodayCount: Int,
     pendingTodayCount: Int,
     missedTodayCount: Int,
     streakLabel: String
 ) {
-    val progressColor = if (missedTodayCount > 0) HomeWarning else HomePink
+    val progressColor = HomeSuccess
     val progressFraction = (progressPercent / 100f).coerceIn(0f, 1f)
     val statusLabel = when {
         dueTodayCount == 0 -> "No doses today"
+        takenTodayCount > 0 -> "$takenTodayCount taken"
         missedTodayCount > 0 -> "$missedTodayCount missed dose"
         pendingTodayCount == 0 -> "All done"
         else -> "$pendingTodayCount pending"
@@ -285,10 +287,10 @@ private fun DailyProgressHero(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(222.dp)
+                .height(244.dp)
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color(0xFF1F7A8C), Color(0xFF145A68))
+                        listOf(Color(0xFFA78BFA), Color(0xFFC4B5FD))
                     )
                 )
                 .padding(24.dp)
@@ -296,64 +298,114 @@ private fun DailyProgressHero(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .offset(x = (-18).dp, y = (-4).dp)
-                    .size(width = 78.dp, height = 30.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(Color(0xFFFFF8EE))
+                    .offset(x = 54.dp, y = (-72).dp)
+                    .size(150.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.10f))
             )
             Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .offset(x = (-52).dp, y = 46.dp)
+                    .size(148.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.10f))
+            )
+
+            ProgressMedicineArt(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .offset(x = (-57).dp, y = (-4).dp)
-                    .size(width = 39.dp, height = 30.dp)
-                    .clip(RoundedCornerShape(topStart = 50.dp, bottomStart = 50.dp))
-                    .background(HomeWarning)
-            )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .offset(x = (-88).dp, y = 4.dp)
-                    .size(12.dp)
-                    .clip(CircleShape)
-                    .background(HomeWarning)
+                    .offset(x = (-28).dp, y = 2.dp)
             )
 
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .offset(y = 44.dp)
-                    .size(104.dp),
+                    .offset(x = 0.dp, y = 44.dp)
+                    .size(150.dp),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(
-                    progress = { progressFraction },
-                    modifier = Modifier.size(94.dp),
-                    color = progressColor,
-                    trackColor = Color.White.copy(alpha = 0.72f),
-                    strokeWidth = 10.dp
-                )
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "$progressPercent%",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
+                Surface(
+                    modifier = Modifier.size(144.dp),
+                    shape = CircleShape,
+                    color = Color.White.copy(alpha = 0.14f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier
+                                .size(118.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.08f))
                         )
-                    )
-                    Text(
-                        text = "today",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White.copy(alpha = 0.86f)
+                        CircularProgressIndicator(
+                            progress = { progressFraction },
+                            modifier = Modifier.size(126.dp),
+                            color = progressColor,
+                            trackColor = Color.White.copy(alpha = 0.34f),
+                            strokeWidth = 9.dp
                         )
-                    )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "$progressPercent%",
+                                style = MaterialTheme.typography.headlineSmall.copy(
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color.White
+                                )
+                            )
+                            Text(
+                                text = "taken",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White.copy(alpha = 0.88f)
+                                )
+                            )
+                        }
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = (-2).dp, y = 8.dp)
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(
+                            when {
+                                missedTodayCount > 0 -> HomeWarning
+                                pendingTodayCount > 0 -> HomePink
+                                else -> HomeSuccess
+                            }
+                        )
+                        .padding(4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (pendingTodayCount == 0 && missedTodayCount == 0 && dueTodayCount > 0) {
+                        Icon(
+                            imageVector = Icons.Outlined.Check,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    } else {
+                        Text(
+                            text = when {
+                                missedTodayCount > 0 -> missedTodayCount.toString()
+                                pendingTodayCount > 0 -> pendingTodayCount.toString()
+                                else -> "0"
+                            },
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White
+                            )
+                        )
+                    }
                 }
             }
 
             Column(
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(end = 116.dp)
+                    .padding(end = 168.dp)
             ) {
                 Text(
                     text = "Your Progress",
@@ -374,7 +426,7 @@ private fun DailyProgressHero(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "$handledCount of $dueTodayCount handled",
+                    text = "$takenTodayCount of $dueTodayCount taken",
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color.White.copy(alpha = 0.86f)
@@ -386,7 +438,7 @@ private fun DailyProgressHero(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(end = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 ProgressMiniChip(
                     label = "Left",
@@ -413,20 +465,29 @@ private fun ProgressMiniChip(
     icon: ImageVector
 ) {
     Surface(
-        shape = RoundedCornerShape(18.dp),
-        color = Color.White.copy(alpha = 0.9f)
+        shape = RoundedCornerShape(50),
+        color = Color.White.copy(alpha = 0.9f),
+        shadowElevation = 4.dp
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(20.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(color.copy(alpha = 0.20f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
             Column {
                 Text(
                     text = value,
@@ -439,7 +500,7 @@ private fun ProgressMiniChip(
                 )
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.labelMedium.copy(
+                    style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.Bold,
                         color = HomeInk
                     ),
@@ -491,6 +552,53 @@ private fun MedicineIllustration(modifier: Modifier = Modifier) {
                 .align(Alignment.Center)
                 .clip(CircleShape)
                     .background(HomePink.copy(alpha = 0.78f))
+        )
+    }
+}
+
+@Composable
+private fun ProgressMedicineArt(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier.size(width = 154.dp, height = 92.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .size(width = 76.dp, height = 30.dp)
+                .clip(RoundedCornerShape(50))
+                .background(Color(0xFFFFF7EC))
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .offset(x = (-38).dp)
+                .size(width = 38.dp, height = 30.dp)
+                .clip(RoundedCornerShape(topStart = 50.dp, bottomStart = 50.dp))
+                .background(HomeWarning)
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .offset(x = (-18).dp, y = (-2).dp)
+                .size(50.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFFFF7EC))
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(width = 32.dp, height = 4.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(HomePink)
+            )
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .offset(x = (-28).dp, y = 10.dp)
+                .size(13.dp)
+                .clip(CircleShape)
+                .background(HomeWarning.copy(alpha = 0.78f))
         )
     }
 }
@@ -665,7 +773,7 @@ private fun SetupSection(
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             SetupActionCard(
                 label = "Schedules",
-                detail = "$scheduleCount times",
+                detail = if (scheduleCount == 1) "1 medicine" else "$scheduleCount medicines",
                 icon = Icons.Outlined.CalendarToday,
                 onClick = onStartScheduleFlow,
                 modifier = Modifier.weight(1f)
@@ -799,7 +907,7 @@ private fun HomeBottomBar(
     modifier: Modifier = Modifier,
     onHomeClick: () -> Unit,
     onQrClick: () -> Unit,
-    onDoseClick: () -> Unit,
+    onAddClick: () -> Unit,
     onReportClick: () -> Unit,
     onMedicationClick: () -> Unit
 ) {
@@ -846,7 +954,7 @@ private fun HomeBottomBar(
                     modifier = Modifier.weight(1f)
                 )
                 DoseNavItem(
-                    onClick = onDoseClick,
+                    onClick = onAddClick,
                     modifier = Modifier.weight(1f)
                 )
                 BottomNavItem(
@@ -936,13 +1044,13 @@ private fun DoseNavItem(
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Add,
-                    contentDescription = "Dose Log",
+                    contentDescription = "Add medicine",
                     tint = Color.White,
                     modifier = Modifier.size(30.dp)
                 )
             }
             Text(
-                text = "Dose",
+                text = "Add",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 color = HomeInk,
@@ -962,6 +1070,7 @@ private fun HomeScreenPreview() {
             scheduleCount = 2,
             dueTodayCount = 4,
             loggedTodayCount = 2,
+            takenTodayCount = 2,
             nextStepLabel = "You have 2 doses remaining today. Tap Dose Log to record them."
         )
     }

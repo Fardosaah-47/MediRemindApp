@@ -37,6 +37,7 @@ import com.example.mediremind.data.repository.MedicationRepository
 import com.example.mediremind.data.repository.QrImportResult
 import com.example.mediremind.data.repository.QrImportParser
 import com.example.mediremind.data.repository.UserProfileRepository
+import com.example.mediremind.domain.EXTRA_ALARM_PATIENT_ID
 import com.example.mediremind.domain.EXTRA_OPEN_DOSE_LOG
 import com.example.mediremind.domain.MedicationAlarmScheduler
 import com.example.mediremind.domain.MedicationPhotoMatcher
@@ -56,6 +57,7 @@ import com.example.mediremind.ui.screen.schedule.DoseScheduleFormScreen
 import com.example.mediremind.ui.screen.schedule.ScheduleDisplayGroup
 import com.example.mediremind.ui.screen.schedule.ScheduleListScreen
 import com.example.mediremind.ui.screen.schedule.ScheduleTimeDisplayItem
+import com.example.mediremind.ui.screen.splash.StartupSplashScreen
 import com.example.mediremind.ui.theme.MediRemindTheme
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
@@ -114,6 +116,10 @@ class MainActivity : ComponentActivity() {
                     AppScreen.HOME
                 }
             }
+            var pendingAlarmPatientId by remember {
+                mutableStateOf(intent?.getLongExtra(EXTRA_ALARM_PATIENT_ID, 0L)?.takeIf { it != 0L })
+            }
+            var showStartupSplash by remember { mutableStateOf(initialScreen == AppScreen.HOME) }
             var currentScreen by remember { mutableStateOf(initialScreen) }
             var medications by remember { mutableStateOf<List<Medication>>(emptyList()) }
             var schedules by remember { mutableStateOf<List<DoseSchedule>>(emptyList()) }
@@ -153,6 +159,10 @@ class MainActivity : ComponentActivity() {
             }
 
             LaunchedEffect(Unit) {
+                if (showStartupSplash) {
+                    delay(2_200)
+                    showStartupSplash = false
+                }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
@@ -229,6 +239,15 @@ class MainActivity : ComponentActivity() {
             }
 
             LaunchedEffect(currentScreen, timeRefreshKey) {
+                pendingAlarmPatientId?.let { alarmPatientId ->
+                    val alarmProfileExists = userProfileRepository.getAllProfiles()
+                        .any { profile -> profile.id == alarmPatientId }
+                    if (alarmProfileExists) {
+                        userProfileRepository.setActivePatientId(alarmPatientId)
+                    }
+                    pendingAlarmPatientId = null
+                }
+
                 activePatientId = userProfileRepository.getActivePatientId()
                 if (currentScreen == AppScreen.HOME || currentScreen == AppScreen.MEDICATION_LIST) {
                     medications = medicationRepository.getMedicationsForPatient(activePatientId)
@@ -304,22 +323,25 @@ class MainActivity : ComponentActivity() {
             }
 
             MediRemindTheme {
-                Scaffold(
-                    modifier = Modifier.fillMaxSize()
-                ) { innerPadding ->
-                    AppContent(
-                        modifier = Modifier.padding(innerPadding),
-                        currentScreen = currentScreen,
-                        medications = medications,
-                        schedules = schedules,
-                        doseLogs = doseLogs,
-                        selectedMedication = selectedMedication,
-                        selectedSchedule = selectedSchedule,
-                        medicationReferenceImageUri = medicationReferenceImageUri,
-                        pendingDoseVerification = pendingDoseVerification,
-                        onStartMedicationFlow = {
-                            currentScreen = AppScreen.MEDICATION_LIST
-                        },
+                if (showStartupSplash) {
+                    StartupSplashScreen(modifier = Modifier.fillMaxSize())
+                } else {
+                    Scaffold(
+                        modifier = Modifier.fillMaxSize()
+                    ) { innerPadding ->
+                        AppContent(
+                            modifier = Modifier.padding(innerPadding),
+                            currentScreen = currentScreen,
+                            medications = medications,
+                            schedules = schedules,
+                            doseLogs = doseLogs,
+                            selectedMedication = selectedMedication,
+                            selectedSchedule = selectedSchedule,
+                            medicationReferenceImageUri = medicationReferenceImageUri,
+                            pendingDoseVerification = pendingDoseVerification,
+                            onStartMedicationFlow = {
+                                currentScreen = AppScreen.MEDICATION_LIST
+                            },
                         onStartScheduleFlow = {
                             currentScreen = AppScreen.SCHEDULE_LIST
                         },
@@ -399,7 +421,9 @@ class MainActivity : ComponentActivity() {
                                 scheduleActiveMedicationAlarms(
                                     context = applicationContext,
                                     schedules = schedules,
-                                    medications = medications
+                                    medications = medications,
+                                    activePatientId = patientId,
+                                    activePatientName = userProfile?.fullName
                                 )
                                 selectedMedication = null
                                 medicationReferenceImageUri = null
@@ -459,7 +483,9 @@ class MainActivity : ComponentActivity() {
                                 scheduleActiveMedicationAlarms(
                                     context = applicationContext,
                                     schedules = schedules,
-                                    medications = medications
+                                    medications = medications,
+                                    activePatientId = activePatientId,
+                                    activePatientName = userProfile?.fullName
                                 )
                                 selectedSchedule = null
                                 currentScreen = AppScreen.SCHEDULE_LIST
@@ -665,7 +691,9 @@ class MainActivity : ComponentActivity() {
                                             scheduleActiveMedicationAlarms(
                                                 context = applicationContext,
                                                 schedules = schedules,
-                                                medications = medications
+                                                medications = medications,
+                                                activePatientId = activePatientId,
+                                                activePatientName = userProfile?.fullName
                                             )
                                             if (importResult.insertedMedicationIds.size == 1) {
                                                 val importedMedication = medications.firstOrNull {
@@ -749,6 +777,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+}
 
 @Composable
 private fun AppContent(
@@ -804,11 +833,17 @@ private fun AppContent(
     when (currentScreen) {
         AppScreen.HOME -> {
             val todayDate = currentDateOnly()
+            val scheduledMedicationCount = schedules.map { schedule ->
+                schedule.medicationId
+            }.distinct().size
             val dueTodayCount = schedules.count { schedule ->
                 isScheduleActiveOnDate(schedule, todayDate)
             }
             val loggedTodayCount = doseLogs.count { log ->
                 log.logDate == todayDate && log.status != DoseStatus.MISSED
+            }
+            val takenTodayCount = doseLogs.count { log ->
+                log.logDate == todayDate && log.status == DoseStatus.TAKEN
             }
             val missedTodayCount = doseLogs.count { log ->
                 log.logDate == todayDate && log.status == DoseStatus.MISSED
@@ -824,9 +859,10 @@ private fun AppContent(
                 modifier = modifier,
                 patientName = userProfile?.fullName,
                 medicationCount = medications.size,
-                scheduleCount = schedules.size,
+                scheduleCount = scheduledMedicationCount,
                 dueTodayCount = dueTodayCount,
                 loggedTodayCount = loggedTodayCount,
+                takenTodayCount = takenTodayCount,
                 missedTodayCount = missedTodayCount,
                 nextStepLabel = nextStepLabel,
                 onStartMedicationFlow = onStartMedicationFlow,
@@ -1320,9 +1356,10 @@ private fun buildScheduleDisplayGroups(
         }
         .map { (_, groupedSchedules) ->
             val firstSchedule = groupedSchedules.first()
+            val medication = medications.firstOrNull { it.id == firstSchedule.medicationId }
             ScheduleDisplayGroup(
-                medicationName = medications.firstOrNull { it.id == firstSchedule.medicationId }?.name
-                    ?: "Unknown Medication",
+                medicationName = medication?.name ?: "Unknown Medication",
+                medicationForm = medication?.form ?: com.example.mediremind.data.model.MedicationForm.OTHER,
                 frequency = firstSchedule.frequency,
                 periodLabel = formatSchedulePeriod(
                     startDate = firstSchedule.startDate,
@@ -1565,13 +1602,7 @@ private fun startDateForNewReminderTime(
     time: String,
     todayDate: String
 ): String {
-    val scheduleMinutes = parseTimeToMinutes(time) ?: return todayDate
-    val lateWindowMinutes = 60
-    return if (currentMinutesOfDay() > scheduleMinutes + lateWindowMinutes) {
-        plusDays(todayDate, 1)
-    } else {
-        todayDate
-    }
+    return plusDays(todayDate, 1)
 }
 
 private fun calculateEndDateFromMedication(
@@ -1660,12 +1691,13 @@ private suspend fun cleanupExpiredVerificationPhotos(
 private fun scheduleActiveMedicationAlarms(
     context: Context,
     schedules: List<DoseSchedule>,
-    medications: List<Medication>
+    medications: List<Medication>,
+    activePatientId: Long,
+    activePatientName: String?
 ) {
     val todayDate = currentDateOnly()
-    val medicationNameById = medications.associate { medication ->
-        medication.id to medication.name
-    }
+    val medicationById = medications.associateBy { medication -> medication.id }
+    val fallbackPatientName = activePatientName?.takeIf { it.isNotBlank() } ?: "Patient"
 
     schedules
         .filter { schedule ->
@@ -1677,10 +1709,16 @@ private fun scheduleActiveMedicationAlarms(
                 )
         }
         .forEach { schedule ->
+            val medication = medicationById[schedule.medicationId]
+            val patientId = schedule.patientId.takeIf { it != 0L }
+                ?: medication?.patientId
+                ?: activePatientId
             MedicationAlarmScheduler.scheduleAlarm(
                 context = context,
                 scheduleId = schedule.id,
-                medicationName = medicationNameById[schedule.medicationId] ?: "Medication",
+                patientId = patientId,
+                patientName = fallbackPatientName,
+                medicationName = medication?.name ?: "Medication",
                 timeString = schedule.time,
                 frequencyName = schedule.frequency.name,
                 startDate = schedule.startDate,

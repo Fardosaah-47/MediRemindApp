@@ -9,11 +9,17 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.example.mediremind.MainActivity
+import com.example.mediremind.MedicationRingingAlarmActivity
 import com.example.mediremind.data.local.AppDatabaseProvider
 import com.example.mediremind.data.model.DoseFrequency
 import java.text.SimpleDateFormat
@@ -27,6 +33,10 @@ import kotlinx.coroutines.launch
 class MedicationAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val scheduleId = intent.getLongExtra(EXTRA_SCHEDULE_ID, 0L)
+        val patientId = intent.getLongExtra(EXTRA_ALARM_PATIENT_ID, 0L)
+        val patientName = intent.getStringExtra(EXTRA_PATIENT_NAME)
+            ?.takeIf { it.isNotBlank() }
+            ?: "Patient"
         val medicationName = intent.getStringExtra(EXTRA_MEDICATION_NAME) ?: "Medication"
         val scheduledTime = intent.getStringExtra(EXTRA_SCHEDULED_TIME) ?: ""
         val frequency = intent.getStringExtra(EXTRA_FREQUENCY) ?: DoseFrequency.ONCE_DAILY.name
@@ -34,13 +44,31 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
         val endDate = intent.getStringExtra(EXTRA_END_DATE).orEmpty()
 
         createNotificationChannel(context)
+        triggerVibration(context)
 
         val tapIntent = PendingIntent.getActivity(
             context,
-            0,
+            scheduleId.toInt(),
             Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra(EXTRA_OPEN_DOSE_LOG, true)
+                putExtra(EXTRA_ALARM_PATIENT_ID, patientId)
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val ringingIntent = PendingIntent.getActivity(
+            context,
+            ringingRequestCode(scheduleId),
+            Intent(context, MedicationRingingAlarmActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra(EXTRA_SCHEDULE_ID, scheduleId)
+                putExtra(EXTRA_ALARM_PATIENT_ID, patientId)
+                putExtra(EXTRA_PATIENT_NAME, patientName)
+                putExtra(EXTRA_MEDICATION_NAME, medicationName)
+                putExtra(EXTRA_SCHEDULED_TIME, scheduledTime)
+                putExtra(EXTRA_FREQUENCY, frequency)
+                putExtra(EXTRA_START_DATE, startDate)
+                putExtra(EXTRA_END_DATE, endDate)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -56,11 +84,29 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
                 System.currentTimeMillis().toInt(),
                 NotificationCompat.Builder(context, CHANNEL_ID)
                     .setSmallIcon(android.R.drawable.ic_popup_reminder)
-                    .setContentTitle("Time to take $medicationName")
-                    .setContentText("Scheduled for $scheduledTime")
+                    .setContentTitle("$patientName: time to take $medicationName")
+                    .setContentText("Scheduled for $scheduledTime - tap to log your dose")
+                    .setStyle(
+                        NotificationCompat.BigTextStyle()
+                            .bigText(
+                                "$patientName, your $medicationName dose is due now.\n" +
+                                    "Scheduled time: $scheduledTime\n\n" +
+                                    "Tap to open MediRemind and log this dose."
+                            )
+                    )
                     .setContentIntent(tapIntent)
                     .setAutoCancel(true)
-                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setCategory(NotificationCompat.CATEGORY_ALARM)
+                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                    .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM))
+                    .setVibrate(VIBRATION_PATTERN)
+                    .setFullScreenIntent(ringingIntent, true)
+                    .setPriority(NotificationCompat.PRIORITY_MAX)
+                    .addAction(
+                        android.R.drawable.ic_menu_agenda,
+                        "Log dose",
+                        tapIntent
+                    )
                     .build()
             )
         }
@@ -69,6 +115,8 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
             MedicationAlarmScheduler.scheduleAlarm(
                 context = context,
                 scheduleId = scheduleId,
+                patientId = patientId,
+                patientName = patientName,
                 medicationName = medicationName,
                 timeString = scheduledTime,
                 frequencyName = frequency,
@@ -83,14 +131,50 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
 
         val notificationManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        if (notificationManager.getNotificationChannel(CHANNEL_ID) != null) return
+
+        val alarmSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ALARM)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+
         val channel = NotificationChannel(
             CHANNEL_ID,
             "Dose reminders",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             description = "Medication dose reminder alerts"
+            setSound(alarmSound, audioAttributes)
+            enableVibration(true)
+            vibrationPattern = VIBRATION_PATTERN
+            lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
+            setShowBadge(true)
+            enableLights(true)
+            lightColor = 0xFFA78BFA.toInt()
         }
         notificationManager.createNotificationChannel(channel)
+    }
+
+    private fun triggerVibration(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager =
+                context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            vibratorManager.defaultVibrator.vibrate(
+                VibrationEffect.createWaveform(VIBRATION_PATTERN, -1)
+            )
+            return
+        }
+
+        @Suppress("DEPRECATION")
+        val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createWaveform(VIBRATION_PATTERN, -1))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(VIBRATION_PATTERN, -1)
+        }
     }
 }
 
@@ -103,8 +187,16 @@ class MedicationBootReceiver : BroadcastReceiver() {
             try {
                 val database = AppDatabaseProvider.getDatabase(context)
                 val medications = database.medicationDao().getAllMedications()
+                val patientNameById = database.userProfileDao()
+                    .getAllUserProfiles()
+                    .associate { profile ->
+                        profile.id to profile.fullName.ifBlank { "Patient" }
+                    }
                 val medicationNameById = medications.associate { medication ->
                     medication.id to medication.name
+                }
+                val medicationPatientIdById = medications.associate { medication ->
+                    medication.id to medication.patientId
                 }
                 val todayDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
@@ -118,6 +210,10 @@ class MedicationBootReceiver : BroadcastReceiver() {
                         MedicationAlarmScheduler.scheduleAlarm(
                             context = context,
                             scheduleId = schedule.id,
+                            patientId = schedule.patientId.takeIf { it != 0L }
+                                ?: medicationPatientIdById[schedule.medicationId]
+                                ?: 0L,
+                            patientName = patientNameById[schedule.patientId] ?: "Patient",
                             medicationName = medicationNameById[schedule.medicationId] ?: "Medication",
                             timeString = schedule.time,
                             frequencyName = schedule.frequency.name,
@@ -136,6 +232,8 @@ object MedicationAlarmScheduler {
     fun scheduleAlarm(
         context: Context,
         scheduleId: Long,
+        patientId: Long,
+        patientName: String,
         medicationName: String,
         timeString: String,
         frequencyName: String,
@@ -156,6 +254,8 @@ object MedicationAlarmScheduler {
         val pendingIntent = reminderPendingIntent(
             context = context,
             scheduleId = scheduleId,
+            patientId = patientId,
+            patientName = patientName,
             medicationName = medicationName,
             timeString = timeString,
             frequencyName = frequencyName,
@@ -192,9 +292,57 @@ object MedicationAlarmScheduler {
         pendingIntent.cancel()
     }
 
+    fun scheduleSnoozeAlarm(
+        context: Context,
+        scheduleId: Long,
+        patientId: Long,
+        patientName: String,
+        medicationName: String,
+        timeString: String,
+        frequencyName: String,
+        startDate: String,
+        endDate: String,
+        delayMinutes: Int = 10
+    ) {
+        if (scheduleId == 0L || delayMinutes <= 0) return
+        val triggerTime = System.currentTimeMillis() + delayMinutes * 60_000L
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val pendingIntent = reminderPendingIntent(
+            context = context,
+            requestCode = snoozeRequestCode(scheduleId),
+            scheduleId = scheduleId,
+            patientId = patientId,
+            patientName = patientName,
+            medicationName = medicationName,
+            timeString = timeString,
+            frequencyName = frequencyName,
+            startDate = startDate,
+            endDate = endDate,
+            flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+            return
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                triggerTime,
+                pendingIntent
+            )
+        } else {
+            alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+        }
+    }
+
     private fun reminderPendingIntent(
         context: Context,
         scheduleId: Long,
+        requestCode: Int = scheduleId.toInt(),
+        patientId: Long,
+        patientName: String,
         medicationName: String,
         timeString: String,
         frequencyName: String,
@@ -204,9 +352,11 @@ object MedicationAlarmScheduler {
     ): PendingIntent {
         return PendingIntent.getBroadcast(
             context,
-            scheduleId.toInt(),
+            requestCode,
             Intent(context, MedicationAlarmReceiver::class.java).apply {
                 putExtra(EXTRA_SCHEDULE_ID, scheduleId)
+                putExtra(EXTRA_ALARM_PATIENT_ID, patientId)
+                putExtra(EXTRA_PATIENT_NAME, patientName)
                 putExtra(EXTRA_MEDICATION_NAME, medicationName)
                 putExtra(EXTRA_SCHEDULED_TIME, timeString)
                 putExtra(EXTRA_FREQUENCY, frequencyName)
@@ -280,13 +430,20 @@ object MedicationAlarmScheduler {
             set(Calendar.MILLISECOND, 999)
         }
     }
+
+    private fun snoozeRequestCode(scheduleId: Long): Int = scheduleId.toInt() xor 0x5A5A0000
 }
 
-private const val CHANNEL_ID = "dose_reminders"
-private const val EXTRA_SCHEDULE_ID = "schedule_id"
-private const val EXTRA_MEDICATION_NAME = "medication_name"
-private const val EXTRA_SCHEDULED_TIME = "scheduled_time"
-private const val EXTRA_FREQUENCY = "frequency"
-private const val EXTRA_START_DATE = "start_date"
-private const val EXTRA_END_DATE = "end_date"
+private fun ringingRequestCode(scheduleId: Long): Int = scheduleId.toInt() xor 0x0A1A0000
+
+private const val CHANNEL_ID = "dose_reminders_alarm_v2"
+private val VIBRATION_PATTERN = longArrayOf(0, 400, 200, 400, 200, 400)
+const val EXTRA_SCHEDULE_ID = "schedule_id"
+const val EXTRA_MEDICATION_NAME = "medication_name"
+const val EXTRA_SCHEDULED_TIME = "scheduled_time"
+const val EXTRA_FREQUENCY = "frequency"
+const val EXTRA_START_DATE = "start_date"
+const val EXTRA_END_DATE = "end_date"
+const val EXTRA_PATIENT_NAME = "patient_name"
 const val EXTRA_OPEN_DOSE_LOG = "open_dose_log"
+const val EXTRA_ALARM_PATIENT_ID = "alarm_patient_id"

@@ -67,7 +67,20 @@ import com.example.mediremind.ui.components.StatusChip
 import com.example.mediremind.ui.components.SurfaceCard
 import com.example.mediremind.ui.theme.AlertCoral
 import com.example.mediremind.ui.theme.ClinicTeal
+import com.example.mediremind.ui.theme.DangerLight
+import com.example.mediremind.ui.theme.DangerRed
+import com.example.mediremind.ui.theme.MediCream
+import com.example.mediremind.ui.theme.MediInk
+import com.example.mediremind.ui.theme.MediMint
+import com.example.mediremind.ui.theme.MediMuted
+import com.example.mediremind.ui.theme.MediPrimaryDark
+import com.example.mediremind.ui.theme.MediPrimaryLight
+import com.example.mediremind.ui.theme.MediSurfaceRaised
 import com.example.mediremind.ui.theme.MediRemindTheme
+import com.example.mediremind.ui.theme.SuccessGreen
+import com.example.mediremind.ui.theme.SuccessLight
+import com.example.mediremind.ui.theme.WarningLight
+import com.example.mediremind.ui.theme.WarningOrange
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -160,7 +173,7 @@ fun DoseLoggingScreen(
                 onBackClick = onBackClick
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MediCream
     ) { innerPadding ->
         LazyColumn(
             modifier = modifier
@@ -345,12 +358,12 @@ private fun TodaySummaryCard(
                 Text(
                     text = "Today",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    color = ClinicTeal
                 )
                 Text(
                     text = summary.dateLabel,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MediMuted
                 )
             }
         }
@@ -395,20 +408,24 @@ private fun TodaySummaryCard(
         }
 
         if (summary.snoozedCount > 0) {
-            StatusChip(label = "Snoozed ${summary.snoozedCount}")
+            StatusChip(
+                label = "Snoozed ${summary.snoozedCount}",
+                containerColor = WarningLight,
+                contentColor = WarningOrange
+            )
         }
 
         if (!summary.nextDoseLabel.isNullOrBlank()) {
             Spacer(modifier = Modifier.height(8.dp))
             InfoCard(
                 title = "Next dose",
-                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                contentColor = MaterialTheme.colorScheme.primary
+                containerColor = MediMint,
+                contentColor = ClinicTeal
             ) {
                 Text(
                     text = summary.nextDoseLabel,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MediInk
                 )
             }
         }
@@ -449,7 +466,7 @@ private fun SummaryStatCard(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.background
+            containerColor = MediCream
         )
     ) {
         androidx.compose.foundation.layout.Column(
@@ -458,13 +475,13 @@ private fun SummaryStatCard(
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.primary
+                color = statusContentColor(label)
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MediMuted
             )
         }
     }
@@ -486,7 +503,7 @@ private fun VerificationStatusCard(
         Text(
             text = "The app is checking whether the live photo looks close to the saved medicine reference.",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSecondaryContainer
+            color = MediInk
         )
         Spacer(modifier = Modifier.height(10.dp))
         Text(
@@ -498,7 +515,7 @@ private fun VerificationStatusCard(
         Text(
             text = "Score: ${verification.similarityScore}% | ${verification.debugDetail}",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSecondaryContainer
+            color = MediMuted
         )
     }
 }
@@ -532,7 +549,7 @@ private fun VerificationCompareCard(
         shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.elevatedCardElevation(2.dp),
         colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = MediSurfaceRaised
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -548,12 +565,12 @@ private fun VerificationCompareCard(
                 Text(
                     text = "Confirm taken dose",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    color = ClinicTeal
                 )
                 Text(
                     text = "${verification.medicationName} at ${verification.scheduledTime}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MediMuted
                 )
             }
         }
@@ -603,7 +620,7 @@ private fun VerificationCompareCard(
                 Text(
                     text = "Score: ${verification.similarityScore}% | ${verification.debugDetail}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MediMuted
                 )
             }
         }
@@ -613,7 +630,7 @@ private fun VerificationCompareCard(
             Text(
                 text = "The photo looks similar but not identical. Different lighting or angle can cause this. If you are sure it is the right medicine, you can still confirm.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MediMuted
             )
         }
 
@@ -698,7 +715,7 @@ private fun VerificationPhotoBox(
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MediMuted
         )
         Spacer(modifier = Modifier.height(4.dp))
         if (bitmap != null) {
@@ -755,7 +772,7 @@ private fun DueDoseCard(
                 Text(
                     text = "Scheduled ${dose.scheduledTime}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MediMuted
                 )
             }
         }
@@ -767,10 +784,14 @@ private fun DueDoseCard(
         ) {
             StatusChip(label = dose.frequencyLabel)
             if (dose.availabilityMessage.isNotBlank()) {
-                StatusChip(label = dose.availabilityMessage)
+                StatusChip(
+                    label = dose.availabilityMessage,
+                    containerColor = WarningLight,
+                    contentColor = WarningOrange
+                )
             }
             if (!dose.todayStatusLabel.isNullOrBlank()) {
-                StatusChip(label = dose.todayStatusLabel)
+                DoseStatusChip(label = dose.todayStatusLabel)
             }
         }
 
@@ -779,7 +800,8 @@ private fun DueDoseCard(
         Button(
             onClick = onTakeDosePhoto,
             modifier = Modifier.fillMaxWidth(),
-            enabled = dose.isActionAllowed
+            enabled = dose.isActionAllowed,
+            colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen)
         ) {
             Icon(
                 imageVector = Icons.Outlined.CameraAlt,
@@ -795,7 +817,8 @@ private fun DueDoseCard(
         OutlinedButton(
             onClick = onSkip,
             modifier = Modifier.fillMaxWidth(),
-            enabled = dose.isActionAllowed
+            enabled = dose.isActionAllowed,
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = DangerRed)
         ) {
             Icon(
                 imageVector = Icons.Outlined.WarningAmber,
@@ -811,7 +834,8 @@ private fun DueDoseCard(
         OutlinedButton(
             onClick = onSnooze,
             modifier = Modifier.fillMaxWidth(),
-            enabled = dose.isActionAllowed
+            enabled = dose.isActionAllowed,
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = WarningOrange)
         ) {
             Icon(
                 imageVector = Icons.Outlined.NotificationsPaused,
@@ -842,13 +866,13 @@ private fun EmptyDoseStateCard(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    color = ClinicTeal
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = message,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MediMuted
                 )
             }
         }
@@ -928,7 +952,7 @@ private fun GroupedDoseLogCard(
                 Text(
                     text = "Times: ${item.scheduledTimes.joinToString(", ")}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MediMuted
                 )
             }
         }
@@ -941,8 +965,8 @@ private fun GroupedDoseLogCard(
             StatusChip(label = formatHistoryDate(item.logDate))
             StatusChip(
                 label = item.statusSummary,
-                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                contentColor = MaterialTheme.colorScheme.primary
+                containerColor = statusContainerColor(item.statusSummary),
+                contentColor = statusContentColor(item.statusSummary)
             )
         }
 
@@ -961,7 +985,7 @@ private fun GroupedDoseLogCard(
             Text(
                 text = "Verification photo saved",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary
+                color = ClinicTeal
             )
 
             if (!item.imageUri.isNullOrBlank()) {
@@ -1003,7 +1027,7 @@ private fun MedicationHistorySummaryCard(
                     Text(
                         text = "Times: ${summary.scheduledTimes.joinToString(", ")}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MediMuted
                     )
                 }
             }
@@ -1012,15 +1036,15 @@ private fun MedicationHistorySummaryCard(
         Spacer(modifier = Modifier.height(12.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatusChip(label = "Taken ${summary.takenCount}")
-            StatusChip(label = "Missed ${summary.missedCount}")
+            DoseStatusChip(label = "Taken ${summary.takenCount}")
+            DoseStatusChip(label = "Missed ${summary.missedCount}")
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatusChip(label = "Skipped ${summary.skippedCount}")
-            StatusChip(label = "Snoozed ${summary.snoozedCount}")
+            DoseStatusChip(label = "Skipped ${summary.skippedCount}")
+            DoseStatusChip(label = "Snoozed ${summary.snoozedCount}")
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -1044,7 +1068,7 @@ private fun MedicationHistorySummaryCard(
                 Text(
                     text = section.title,
                     style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary
+                    color = ClinicTeal
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 section.items.forEach { item ->
@@ -1067,8 +1091,8 @@ private fun MedicationHistoryDetailCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatusChip(
                     label = item.statusSummary,
-                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                    contentColor = MaterialTheme.colorScheme.primary
+                    containerColor = statusContainerColor(item.statusSummary),
+                    contentColor = statusContentColor(item.statusSummary)
                 )
                 StatusChip(label = "Times ${item.scheduledTimes.joinToString(", ")}")
             }
@@ -1079,7 +1103,7 @@ private fun MedicationHistoryDetailCard(
                     Text(
                         text = "Recorded: $entry",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MediMuted
                     )
                 }
             }
@@ -1089,7 +1113,7 @@ private fun MedicationHistoryDetailCard(
                 Text(
                     text = "Verification photo saved",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
+                    color = ClinicTeal
                 )
                 if (!item.imageUri.isNullOrBlank()) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1160,13 +1184,44 @@ private fun StatusSectionHeader(
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary
+            color = statusContentColor(title)
         )
         StatusChip(
             label = count.toString(),
-            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-            contentColor = MaterialTheme.colorScheme.primary
+            containerColor = statusContainerColor(title),
+            contentColor = statusContentColor(title)
         )
+    }
+}
+
+@Composable
+private fun DoseStatusChip(label: String) {
+    StatusChip(
+        label = label,
+        containerColor = statusContainerColor(label),
+        contentColor = statusContentColor(label)
+    )
+}
+
+private fun statusContainerColor(label: String): Color {
+    val normalized = label.lowercase()
+    return when {
+        "taken" in normalized || "complete" in normalized || "success" in normalized -> SuccessLight
+        "missed" in normalized || "skip" in normalized || "skipped" in normalized -> DangerLight
+        "snooze" in normalized || "snoozed" in normalized || "upcoming" in normalized ||
+            "available" in normalized || "later" in normalized || "remaining" in normalized -> WarningLight
+        else -> MediPrimaryLight
+    }
+}
+
+private fun statusContentColor(label: String): Color {
+    val normalized = label.lowercase()
+    return when {
+        "taken" in normalized || "complete" in normalized || "success" in normalized -> SuccessGreen
+        "missed" in normalized || "skip" in normalized || "skipped" in normalized -> DangerRed
+        "snooze" in normalized || "snoozed" in normalized || "upcoming" in normalized ||
+            "available" in normalized || "later" in normalized || "remaining" in normalized -> WarningOrange
+        else -> MediPrimaryDark
     }
 }
 

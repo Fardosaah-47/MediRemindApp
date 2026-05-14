@@ -32,11 +32,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.mediremind.ui.theme.AppAlertSoft
-import com.example.mediremind.ui.theme.AppBorder
-import com.example.mediremind.ui.theme.AppPrimarySoft
-import com.example.mediremind.ui.theme.AppSecondaryText
-import com.example.mediremind.ui.theme.AppText
+import com.example.mediremind.ui.theme.MediAmber
+import com.example.mediremind.ui.theme.MediCream
+import com.example.mediremind.ui.theme.MediInk
+import com.example.mediremind.ui.theme.MediPrimaryDark
+import com.example.mediremind.ui.theme.MediPrimaryLight
+import com.example.mediremind.ui.theme.MediMuted
+import com.example.mediremind.ui.theme.MediSurfaceRaised
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,9 +64,9 @@ fun MediRemindTopBar(
         },
         actions = { actions() },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background,
-            titleContentColor = MaterialTheme.colorScheme.onSurface,
-            navigationIconContentColor = MaterialTheme.colorScheme.onSurface
+            containerColor = MediCream,
+            titleContentColor = MediInk,
+            navigationIconContentColor = MediInk
         )
     )
 }
@@ -80,7 +82,7 @@ fun SectionLabel(
             fontWeight = FontWeight.ExtraBold,
             letterSpacing = 0.8.sp
         ),
-        color = AppSecondaryText,
+        color = MediMuted,
         modifier = modifier
     )
 }
@@ -89,8 +91,8 @@ fun SectionLabel(
 fun InfoCard(
     title: String,
     modifier: Modifier = Modifier,
-    containerColor: Color = MaterialTheme.colorScheme.secondaryContainer,
-    contentColor: Color = MaterialTheme.colorScheme.onSecondaryContainer,
+    containerColor: Color = MediPrimaryLight,
+    contentColor: Color = MediPrimaryDark,
     content: @Composable () -> Unit
 ) {
     Card(
@@ -118,7 +120,7 @@ fun SurfaceCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = MediSurfaceRaised),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
@@ -131,8 +133,8 @@ fun SurfaceCard(
 fun StatusChip(
     label: String,
     modifier: Modifier = Modifier,
-    containerColor: Color = AppPrimarySoft,
-    contentColor: Color = MaterialTheme.colorScheme.primary
+    containerColor: Color = MediPrimaryLight,
+    contentColor: Color = MediPrimaryDark
 ) {
     Surface(
         color = containerColor,
@@ -152,8 +154,8 @@ fun StatusChip(
 fun IconBadge(
     icon: ImageVector,
     modifier: Modifier = Modifier,
-    tint: Color = MaterialTheme.colorScheme.primary,
-    background: Color = AppPrimarySoft,
+    tint: Color = MediPrimaryDark,
+    background: Color = MediPrimaryLight,
     size: Int = 40
 ) {
     Box(
@@ -186,7 +188,7 @@ fun InitialsAvatar(
     Box(
         modifier = modifier
             .size(size.dp)
-            .background(color = MaterialTheme.colorScheme.primary, shape = CircleShape),
+            .background(color = MediAmber, shape = CircleShape),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -195,7 +197,7 @@ fun InitialsAvatar(
                 fontWeight = FontWeight.Bold,
                 fontSize = (size * 0.32f).sp
             ),
-            color = MaterialTheme.colorScheme.onPrimary
+            color = MediInk
         )
     }
 }
@@ -214,7 +216,7 @@ fun NumberedStepRow(
         Box(
             modifier = Modifier
                 .size(26.dp)
-                .background(color = MaterialTheme.colorScheme.primary, shape = CircleShape),
+                .background(color = MediPrimaryDark, shape = CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Text(

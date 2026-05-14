@@ -4,12 +4,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,6 +23,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowForwardIos
 import androidx.compose.material.icons.outlined.AddAlarm
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
@@ -31,16 +34,28 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.mediremind.data.model.DoseFrequency
 import com.example.mediremind.data.model.DoseSchedule
+import com.example.mediremind.data.model.MedicationForm
 import com.example.mediremind.ui.components.MediRemindTopBar
-import com.example.mediremind.ui.components.SectionLabel
-import com.example.mediremind.ui.components.StatusChip
+import com.example.mediremind.ui.theme.MediAmber
+import com.example.mediremind.ui.theme.MediBlue
+import com.example.mediremind.ui.theme.MediCoral
+import com.example.mediremind.ui.theme.MediCream
+import com.example.mediremind.ui.theme.MediInk
+import com.example.mediremind.ui.theme.MediMuted
+import com.example.mediremind.ui.theme.MediPurple
 import com.example.mediremind.ui.theme.MediRemindTheme
+import com.example.mediremind.ui.theme.MediSurfaceRaised
+import com.example.mediremind.ui.theme.MediTeal
 
 data class ScheduleTimeDisplayItem(
     val schedule: DoseSchedule,
@@ -49,6 +64,7 @@ data class ScheduleTimeDisplayItem(
 
 data class ScheduleDisplayGroup(
     val medicationName: String,
+    val medicationForm: MedicationForm = MedicationForm.OTHER,
     val frequency: DoseFrequency,
     val periodLabel: String,
     val timeEntries: List<ScheduleTimeDisplayItem>
@@ -70,7 +86,11 @@ fun ScheduleListScreen(
             Button(
                 onClick = onAddScheduleClick,
                 shape = RoundedCornerShape(16.dp),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp)
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MediAmber,
+                    contentColor = MediInk
+                )
             ) {
                 Icon(
                     imageVector = Icons.Outlined.AddAlarm,
@@ -81,7 +101,7 @@ fun ScheduleListScreen(
                 Text("Add Schedule", style = MaterialTheme.typography.labelLarge)
             }
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MediCream
     ) { innerPadding ->
         if (scheduleGroups.isEmpty()) {
             EmptySchedulesState(
@@ -105,9 +125,12 @@ fun ScheduleListScreen(
             ) {
                 item {
                     Text(
-                        text = "${scheduleGroups.size} medication schedule group${if (scheduleGroups.size != 1) "s" else ""}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                        text = "SCHEDULES - ${scheduleGroups.size} MEDICATION GROUP${if (scheduleGroups.size != 1) "S" else ""}",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 1.2.sp
+                        ),
+                        color = MediTeal
                     )
                 }
 
@@ -127,45 +150,126 @@ private fun ScheduleGroupCard(
     group: ScheduleDisplayGroup,
     onScheduleClick: (DoseSchedule) -> Unit
 ) {
+    val formColor = formColor(group.medicationForm)
+    val formLabel = group.medicationForm.name.lowercase().replaceFirstChar { it.uppercase() }
+    val initials = group.medicationName
+        .split(" ")
+        .take(2)
+        .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+        .joinToString("")
+        .ifBlank { "Rx" }
+
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(24.dp),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.elevatedCardColors(containerColor = MediSurfaceRaised)
     ) {
-        androidx.compose.foundation.layout.Column(
-            modifier = Modifier.padding(16.dp)
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text(
-                text = group.medicationName,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(124.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(formColor.copy(alpha = 0.10f))
             ) {
-                StatusChip(
-                    label = group.frequency.name.lowercase().replace('_', ' ')
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 24.dp, y = (-28).dp)
+                        .size(118.dp)
+                        .clip(CircleShape)
+                        .background(formColor.copy(alpha = 0.14f))
                 )
-                Text(
-                    text = group.periodLabel,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .offset(x = (-24).dp, y = 30.dp)
+                        .size(96.dp)
+                        .clip(CircleShape)
+                        .background(MediAmber.copy(alpha = 0.14f))
                 )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SchedulePill(
+                        label = formLabel,
+                        containerColor = Color.White.copy(alpha = 0.84f),
+                        contentColor = formColor
+                    )
+                    SchedulePill(
+                        label = "${group.timeEntries.size} time${if (group.timeEntries.size == 1) "" else "s"}",
+                        containerColor = Color.White.copy(alpha = 0.72f),
+                        contentColor = MediInk
+                    )
+                }
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(MediAmber),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = initials,
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold),
+                            color = MediInk
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = group.medicationName,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                            color = MediInk,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = group.periodLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MediMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
-
-            SectionLabel(text = "REMINDER TIMES")
-            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                SchedulePill(
+                    label = group.frequency.name.lowercase().replace('_', ' '),
+                    containerColor = formColor.copy(alpha = 0.12f),
+                    contentColor = formColor
+                )
+                Text(
+                    text = "Reminder times",
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold),
+                    color = MediMuted
+                )
+            }
 
             group.timeEntries.forEachIndexed { index, entry ->
                 ScheduleTimeRow(
                     reminderTime = entry.reminderTime,
+                    accentColor = formColor,
                     onClick = { onScheduleClick(entry.schedule) }
                 )
                 if (index != group.timeEntries.lastIndex) {
@@ -179,6 +283,7 @@ private fun ScheduleGroupCard(
 @Composable
 private fun ScheduleTimeRow(
     reminderTime: String,
+    accentColor: Color,
     onClick: () -> Unit
 ) {
     Card(
@@ -187,7 +292,7 @@ private fun ScheduleTimeRow(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.background
+            containerColor = MediCream
         )
     ) {
         Row(
@@ -197,18 +302,58 @@ private fun ScheduleTimeRow(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = reminderTime,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(accentColor.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Schedule,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(21.dp)
+                    )
+                }
+                Text(
+                    text = reminderTime,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                    color = MediInk
+                )
+            }
             Icon(
                 imageVector = Icons.AutoMirrored.Outlined.ArrowForwardIos,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                tint = MediMuted.copy(alpha = 0.6f),
                 modifier = Modifier.size(14.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun SchedulePill(
+    label: String,
+    containerColor: Color,
+    contentColor: Color
+) {
+    androidx.compose.material3.Surface(
+        color = containerColor,
+        shape = RoundedCornerShape(50)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.ExtraBold),
+            color = contentColor,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -225,7 +370,7 @@ private fun EmptySchedulesState(
             modifier = Modifier
                 .size(80.dp)
                 .background(
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                    color = MediTeal.copy(alpha = 0.10f),
                     shape = CircleShape
                 ),
             contentAlignment = Alignment.Center
@@ -233,7 +378,7 @@ private fun EmptySchedulesState(
             Icon(
                 imageVector = Icons.Outlined.Schedule,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MediTeal,
                 modifier = Modifier.size(40.dp)
             )
         }
@@ -241,15 +386,25 @@ private fun EmptySchedulesState(
         Text(
             text = "No schedules yet",
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground
+                color = MediInk
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = "Add a schedule so MediRemind knows when each medication should be taken.",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
+                color = MediMuted,
             textAlign = TextAlign.Center
         )
+    }
+}
+
+private fun formColor(form: MedicationForm): Color {
+    return when (form) {
+        MedicationForm.TABLET -> MediTeal
+        MedicationForm.CAPSULE -> MediPurple
+        MedicationForm.LIQUID -> MediBlue
+        MedicationForm.INJECTION -> MediCoral
+        MedicationForm.OTHER -> MediMuted
     }
 }
 
@@ -257,6 +412,7 @@ private fun sampleScheduleDisplayGroups(): List<ScheduleDisplayGroup> {
     return listOf(
         ScheduleDisplayGroup(
             medicationName = "Paracetamol",
+            medicationForm = MedicationForm.TABLET,
             frequency = DoseFrequency.THREE_TIMES_DAILY,
             periodLabel = "19 Apr 2026 - 29 Apr 2026",
             timeEntries = listOf(

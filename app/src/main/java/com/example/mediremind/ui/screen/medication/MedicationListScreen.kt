@@ -53,6 +53,7 @@ import com.example.mediremind.ui.components.MediRemindTopBar
 import com.example.mediremind.ui.theme.MediAmber
 import com.example.mediremind.ui.theme.MediBlue
 import com.example.mediremind.ui.theme.MediCoral
+import com.example.mediremind.ui.theme.MediCream
 import com.example.mediremind.ui.theme.MediGreen
 import com.example.mediremind.ui.theme.MediInk
 import com.example.mediremind.ui.theme.MediMint
@@ -93,7 +94,7 @@ fun MedicationListScreen(
                 Text("Add Medication", style = MaterialTheme.typography.labelLarge)
             }
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MediCream
     ) { innerPadding ->
         if (medications.isEmpty()) {
             EmptyMedicationsState(
