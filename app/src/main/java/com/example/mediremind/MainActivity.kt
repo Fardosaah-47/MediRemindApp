@@ -44,6 +44,7 @@ import com.example.mediremind.domain.MedicationAlarmScheduler
 import com.example.mediremind.domain.MedicationPhotoMatcher
 import com.example.mediremind.domain.RefillAlarmScheduler
 import com.example.mediremind.ui.screen.home.HomeScreen
+import com.example.mediremind.ui.screen.adherence.AdherenceScreen
 import com.example.mediremind.ui.screen.medication.MedicationFormScreen
 import com.example.mediremind.ui.screen.medication.MedicationListScreen
 import com.example.mediremind.ui.screen.medication.QrImportScreen
@@ -82,7 +83,8 @@ private enum class AppScreen {
     QR_IMPORT,
     PROFILE,
     PATIENT_REPORT,
-    CAREGIVER_SCAN
+    CAREGIVER_SCAN,
+    ADHERENCE
 }
 
 private data class PendingDoseVerification(
@@ -260,11 +262,12 @@ class MainActivity : ComponentActivity() {
                     currentScreen == AppScreen.SCHEDULE_FORM ||
                     currentScreen == AppScreen.DOSE_LOGGING ||
                     currentScreen == AppScreen.PROFILE ||
-                    currentScreen == AppScreen.PATIENT_REPORT
+                    currentScreen == AppScreen.PATIENT_REPORT ||
+                    currentScreen == AppScreen.ADHERENCE
                 ) {
                     medications = medicationRepository.getMedicationsForPatient(activePatientId)
                 }
-                if (currentScreen == AppScreen.HOME || currentScreen == AppScreen.PROFILE || currentScreen == AppScreen.PATIENT_REPORT) {
+                if (currentScreen == AppScreen.HOME || currentScreen == AppScreen.PROFILE || currentScreen == AppScreen.PATIENT_REPORT || currentScreen == AppScreen.ADHERENCE) {
                     allProfiles = userProfileRepository.getAllProfiles()
                     userProfile = userProfileRepository.getActiveProfile()
                 }
@@ -272,20 +275,23 @@ class MainActivity : ComponentActivity() {
                     currentScreen == AppScreen.HOME ||
                     currentScreen == AppScreen.SCHEDULE_LIST ||
                     currentScreen == AppScreen.DOSE_LOGGING ||
-                    currentScreen == AppScreen.PATIENT_REPORT
+                    currentScreen == AppScreen.PATIENT_REPORT ||
+                    currentScreen == AppScreen.ADHERENCE
                 ) {
                     schedules = doseScheduleRepository.getSchedulesForPatient(activePatientId)
                 }
                 if (
                     currentScreen == AppScreen.HOME ||
                     currentScreen == AppScreen.DOSE_LOGGING ||
-                    currentScreen == AppScreen.PATIENT_REPORT
+                    currentScreen == AppScreen.PATIENT_REPORT ||
+                    currentScreen == AppScreen.ADHERENCE
                 ) {
                     doseLogs = doseLogRepository.getLogsForPatient(activePatientId)
                 }
                 if (
                     currentScreen == AppScreen.DOSE_LOGGING ||
-                    currentScreen == AppScreen.PATIENT_REPORT
+                    currentScreen == AppScreen.PATIENT_REPORT ||
+                    currentScreen == AppScreen.ADHERENCE
                 ) {
                     val loadedSchedules = doseScheduleRepository.getSchedulesForPatient(activePatientId)
                     val loadedDoseLogs = doseLogRepository.getLogsForPatient(activePatientId)
@@ -365,6 +371,9 @@ class MainActivity : ComponentActivity() {
                             scannedCaregiverReportMessage =
                                 "Scan a MediRemind caregiver QR to view a readable report here."
                             currentScreen = AppScreen.CAREGIVER_SCAN
+                        },
+                        onStartAdherenceFlow = {
+                            currentScreen = AppScreen.ADHERENCE
                         },
                         onOpenMedicationForm = {
                             selectedMedication = null
@@ -830,6 +839,7 @@ private fun AppContent(
     onStartProfileFlow: () -> Unit,
     onStartPatientReportFlow: () -> Unit,
     onStartCaregiverScanFlow: () -> Unit,
+    onStartAdherenceFlow: () -> Unit,
     onOpenMedicationForm: () -> Unit,
     onOpenMedicationEditor: (Medication) -> Unit,
     onOpenScheduleForm: () -> Unit,
@@ -904,7 +914,8 @@ private fun AppContent(
                 onStartQrImportFlow = onStartQrImportFlow,
                 onStartProfileFlow = onStartProfileFlow,
                 onStartPatientReportFlow = onStartPatientReportFlow,
-                onStartCaregiverScanFlow = onStartCaregiverScanFlow
+                onStartCaregiverScanFlow = onStartCaregiverScanFlow,
+                onStartAdherenceFlow = onStartAdherenceFlow
             )
         }
 
@@ -1113,6 +1124,15 @@ private fun AppContent(
                 scannedReportMessage = scannedCaregiverReportMessage,
                 onScanReportQrClick = onScanCaregiverReportQr,
                 onBackClick = onBackFromCaregiverQr
+            )
+        }
+
+        AppScreen.ADHERENCE -> {
+            AdherenceScreen(
+                modifier = modifier,
+                logs = doseLogs,
+                patientName = userProfile?.fullName?.takeIf { it.isNotBlank() } ?: "Patient",
+                onBackClick = onBackHome
             )
         }
     }

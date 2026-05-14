@@ -98,7 +98,8 @@ fun HomeScreen(
     onStartQrImportFlow: () -> Unit = {},
     onStartProfileFlow: () -> Unit = {},
     onStartPatientReportFlow: () -> Unit = {},
-    onStartCaregiverScanFlow: () -> Unit = {}
+    onStartCaregiverScanFlow: () -> Unit = {},
+    onStartAdherenceFlow: () -> Unit = {}
 ) {
     val displayName = patientName?.takeIf { it.isNotBlank() } ?: "Patient"
     val hasDoseToday = dueTodayCount > 0
@@ -168,7 +169,8 @@ fun HomeScreen(
                 CaregiverSection(
                     nextStepLabel = nextStepLabel,
                     onStartPatientReportFlow = onStartPatientReportFlow,
-                    onStartCaregiverScanFlow = onStartCaregiverScanFlow
+                    onStartCaregiverScanFlow = onStartCaregiverScanFlow,
+                    onStartAdherenceFlow = onStartAdherenceFlow
                 )
             }
         }
@@ -864,7 +866,8 @@ private fun SetupActionCard(
 private fun CaregiverSection(
     nextStepLabel: String,
     onStartPatientReportFlow: () -> Unit,
-    onStartCaregiverScanFlow: () -> Unit
+    onStartCaregiverScanFlow: () -> Unit,
+    onStartAdherenceFlow: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
@@ -890,6 +893,14 @@ private fun CaregiverSection(
                 modifier = Modifier.weight(1f)
             )
         }
+        SetupActionCard(
+            label = "Streak",
+            detail = "Adherence",
+            icon = Icons.Outlined.LocalFireDepartment,
+            onClick = onStartAdherenceFlow,
+            modifier = Modifier.fillMaxWidth(),
+            highlight = true
+        )
         Text(
             text = nextStepLabel,
             style = MaterialTheme.typography.bodySmall.copy(
