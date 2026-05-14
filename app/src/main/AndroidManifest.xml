@@ -38,6 +38,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".domain.RefillAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".domain.MedicationBootReceiver"
             android:exported="false">
             <intent-filter>

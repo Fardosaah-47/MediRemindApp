@@ -92,6 +92,8 @@ data class DoseLoggingItem(
     val medicationName: String,
     val scheduledTime: String,
     val frequencyLabel: String,
+    val stockLabel: String = "",
+    val isLowStock: Boolean = false,
     val isActionAllowed: Boolean = true,
     val availabilityMessage: String = "",
     val todayStatusLabel: String? = null
@@ -793,6 +795,15 @@ private fun DueDoseCard(
             if (!dose.todayStatusLabel.isNullOrBlank()) {
                 DoseStatusChip(label = dose.todayStatusLabel)
             }
+        }
+
+        if (dose.stockLabel.isNotBlank()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            StatusChip(
+                label = "Remaining: ${dose.stockLabel}",
+                containerColor = if (dose.isLowStock) DangerLight else SuccessLight,
+                contentColor = if (dose.isLowStock) DangerRed else SuccessGreen
+            )
         }
 
         Spacer(modifier = Modifier.height(14.dp))

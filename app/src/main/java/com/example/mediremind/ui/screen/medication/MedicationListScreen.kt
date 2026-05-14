@@ -151,6 +151,8 @@ private fun MedicationCard(
     val isLowStock = medication.currentStockAmount <= medication.refillAlertAt
     val formColor = formColor(medication.form)
     val formLabel = medication.form.name.lowercase().replaceFirstChar { it.uppercase() }
+    val remainingStockLabel =
+        "Remaining: ${formatStockAmount(medication.currentStockAmount)} ${medication.stockUnit}"
     val initials = medication.name
         .split(" ")
         .take(2)
@@ -271,7 +273,7 @@ private fun MedicationCard(
                         )
                     }
                     Pill(
-                        label = "${medication.currentStockAmount.toInt()} ${medication.stockUnit}",
+                        label = remainingStockLabel,
                         containerColor = if (isLowStock) MediCoral.copy(alpha = 0.14f) else MediGreen.copy(alpha = 0.12f),
                         contentColor = if (isLowStock) MediCoral else MediGreen
                     )
@@ -398,6 +400,14 @@ private fun formColor(form: MedicationForm): Color {
         MedicationForm.LIQUID -> MediBlue
         MedicationForm.INJECTION -> MediCoral
         MedicationForm.OTHER -> MediMuted
+    }
+}
+
+private fun formatStockAmount(value: Double): String {
+    return if (value % 1.0 == 0.0) {
+        value.toInt().toString()
+    } else {
+        String.format("%.1f", value)
     }
 }
 

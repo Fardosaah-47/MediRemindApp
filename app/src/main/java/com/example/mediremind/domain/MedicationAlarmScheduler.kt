@@ -81,7 +81,7 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
 
         if (canNotify) {
             NotificationManagerCompat.from(context).notify(
-                System.currentTimeMillis().toInt(),
+                scheduleId.toInt(),
                 NotificationCompat.Builder(context, CHANNEL_ID)
                     .setSmallIcon(android.R.drawable.ic_popup_reminder)
                     .setContentTitle("$patientName: time to take $medicationName")
@@ -290,6 +290,12 @@ object MedicationAlarmScheduler {
         ) ?: return
         alarmManager.cancel(pendingIntent)
         pendingIntent.cancel()
+        cancelDoseNotification(context, scheduleId)
+    }
+
+    fun cancelDoseNotification(context: Context, scheduleId: Long) {
+        if (scheduleId == 0L) return
+        NotificationManagerCompat.from(context).cancel(scheduleId.toInt())
     }
 
     fun scheduleSnoozeAlarm(

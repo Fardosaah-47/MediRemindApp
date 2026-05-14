@@ -39,8 +39,10 @@ import com.example.mediremind.data.repository.QrImportParser
 import com.example.mediremind.data.repository.UserProfileRepository
 import com.example.mediremind.domain.EXTRA_ALARM_PATIENT_ID
 import com.example.mediremind.domain.EXTRA_OPEN_DOSE_LOG
+import com.example.mediremind.domain.EXTRA_OPEN_MEDICATIONS
 import com.example.mediremind.domain.MedicationAlarmScheduler
 import com.example.mediremind.domain.MedicationPhotoMatcher
+import com.example.mediremind.domain.RefillAlarmScheduler
 import com.example.mediremind.ui.screen.home.HomeScreen
 import com.example.mediremind.ui.screen.medication.MedicationFormScreen
 import com.example.mediremind.ui.screen.medication.MedicationListScreen
@@ -110,10 +112,10 @@ class MainActivity : ComponentActivity() {
             val userProfileRepository = remember { UserProfileRepository(applicationContext) }
 
             val initialScreen = remember {
-                if (intent?.getBooleanExtra(EXTRA_OPEN_DOSE_LOG, false) == true) {
-                    AppScreen.DOSE_LOGGING
-                } else {
-                    AppScreen.HOME
+                when {
+                    intent?.getBooleanExtra(EXTRA_OPEN_DOSE_LOG, false) == true -> AppScreen.DOSE_LOGGING
+                    intent?.getBooleanExtra(EXTRA_OPEN_MEDICATIONS, false) == true -> AppScreen.MEDICATION_LIST
+                    else -> AppScreen.HOME
                 }
             }
             var pendingAlarmPatientId by remember {
@@ -418,6 +420,18 @@ class MainActivity : ComponentActivity() {
                                 }
                                 medications = medicationRepository.getMedicationsForPatient(patientId)
                                 schedules = doseScheduleRepository.getSchedulesForPatient(patientId)
+                                medications.firstOrNull { savedMedication ->
+                                    savedMedication.id == savedMedicationId
+                                }?.let { savedMedication ->
+                                    RefillAlarmScheduler.evaluateAndSchedule(
+                                        context = applicationContext,
+                                        medication = savedMedication,
+                                        dosesPerDay = schedules.count { schedule ->
+                                            schedule.medicationId == savedMedication.id &&
+                                                isScheduleActiveOnDate(schedule, currentDateOnly())
+                                        }.coerceAtLeast(1)
+                                    )
+                                }
                                 scheduleActiveMedicationAlarms(
                                     context = applicationContext,
                                     schedules = schedules,
@@ -447,6 +461,7 @@ class MainActivity : ComponentActivity() {
                                         null
                                     )
                                 }
+                                RefillAlarmScheduler.cancelFutureAlarm(applicationContext, medication.id)
                                 medicationRepository.deleteMedication(medication)
                                 medications = medicationRepository.getMedicationsForPatient(activePatientId)
                                 schedules = doseScheduleRepository.getSchedulesForPatient(activePatientId)
@@ -556,11 +571,20 @@ class MainActivity : ComponentActivity() {
                                                 imageUri = verification.capturedImageUri
                                             )
                                         )
+                                        MedicationAlarmScheduler.cancelDoseNotification(
+                                            context = applicationContext,
+                                            scheduleId = verification.doseItem.doseScheduleId
+                                        )
                                         if (shouldDeductStock) {
                                             decrementMedicationStock(
                                                 medicationId = verification.doseItem.medicationId,
                                                 patientId = activePatientId,
-                                                medicationRepository = medicationRepository
+                                                medicationRepository = medicationRepository,
+                                                context = applicationContext,
+                                                dosesPerDay = schedules.count { schedule ->
+                                                    schedule.medicationId == verification.doseItem.medicationId &&
+                                                        isScheduleActiveOnDate(schedule, currentDateOnly())
+                                                }.coerceAtLeast(1)
                                             )
                                         }
                                         medications = medicationRepository.getMedicationsForPatient(activePatientId)
@@ -614,11 +638,20 @@ class MainActivity : ComponentActivity() {
                                         imageUri = null
                                     )
                                 )
+                                MedicationAlarmScheduler.cancelDoseNotification(
+                                    context = applicationContext,
+                                    scheduleId = doseItem.doseScheduleId
+                                )
                                 if (shouldDeductStock) {
                                     decrementMedicationStock(
                                         medicationId = doseItem.medicationId,
                                         patientId = activePatientId,
-                                        medicationRepository = medicationRepository
+                                        medicationRepository = medicationRepository,
+                                        context = applicationContext,
+                                        dosesPerDay = schedules.count { schedule ->
+                                            schedule.medicationId == doseItem.medicationId &&
+                                                isScheduleActiveOnDate(schedule, currentDateOnly())
+                                        }.coerceAtLeast(1)
                                     )
                                     medications = medicationRepository.getMedicationsForPatient(activePatientId)
                                 }
@@ -949,6 +982,7 @@ private fun AppContent(
                 dueDoses = visibleRemainingSchedules
                     .map { schedule ->
                     val latestLog = latestTodayLogBySchedule[schedule.id]
+                    val medication = medications.firstOrNull { it.id == schedule.medicationId }
                     val availability = evaluateDoseAvailability(
                         schedule = schedule,
                         todayLog = latestLog
@@ -956,10 +990,15 @@ private fun AppContent(
                     DoseLoggingItem(
                         doseScheduleId = schedule.id,
                         medicationId = schedule.medicationId,
-                        medicationName = medications.firstOrNull { it.id == schedule.medicationId }?.name
-                            ?: "Unknown Medication",
+                        medicationName = medication?.name ?: "Unknown Medication",
                         scheduledTime = schedule.time,
                         frequencyLabel = schedule.frequency.name.lowercase().replace('_', ' '),
+                        stockLabel = medication?.let { med ->
+                            "${formatStockAmount(med.currentStockAmount)} ${med.stockUnit}"
+                        }.orEmpty(),
+                        isLowStock = medication?.let { med ->
+                            med.refillAlertAt > 0.0 && med.currentStockAmount <= med.refillAlertAt
+                        } ?: false,
                         isActionAllowed = availability.isActionAllowed,
                         availabilityMessage = availability.message,
                         todayStatusLabel = latestLog?.status?.name
@@ -1411,6 +1450,14 @@ private fun parseTimeToMinutes(value: String): Int? {
     }
 }
 
+private fun formatStockAmount(value: Double): String {
+    return if (value % 1.0 == 0.0) {
+        value.toInt().toString()
+    } else {
+        String.format(Locale.getDefault(), "%.1f", value)
+    }
+}
+
 private fun isScheduleActiveOnDate(
     schedule: DoseSchedule,
     dateValue: String
@@ -1749,7 +1796,9 @@ private suspend fun clearTodayAutoMissForEditedSchedule(
 private suspend fun decrementMedicationStock(
     medicationId: Long,
     patientId: Long,
-    medicationRepository: MedicationRepository
+    medicationRepository: MedicationRepository,
+    context: Context,
+    dosesPerDay: Int = 1
 ) {
     val medication = medicationRepository.getMedicationByIdForPatient(
         id = medicationId,
@@ -1757,10 +1806,14 @@ private suspend fun decrementMedicationStock(
     ) ?: return
     if (medication.currentStockAmount <= 0.0) return
 
-    medicationRepository.updateMedication(
-        medication.copy(
-            currentStockAmount = (medication.currentStockAmount - 1.0).coerceAtLeast(0.0)
-        )
+    val updatedMedication = medication.copy(
+        currentStockAmount = (medication.currentStockAmount - 1.0).coerceAtLeast(0.0)
+    )
+    medicationRepository.updateMedication(updatedMedication)
+    RefillAlarmScheduler.evaluateAndSchedule(
+        context = context,
+        medication = updatedMedication,
+        dosesPerDay = dosesPerDay
     )
 }
 
