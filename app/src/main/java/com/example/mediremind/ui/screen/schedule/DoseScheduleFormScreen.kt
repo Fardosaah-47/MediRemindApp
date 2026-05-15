@@ -42,6 +42,7 @@ import com.example.mediremind.ui.components.InfoCard
 import com.example.mediremind.ui.components.MediRemindTopBar
 import com.example.mediremind.ui.components.SectionLabel
 import com.example.mediremind.ui.components.SurfaceCard
+import com.example.mediremind.ui.theme.MediCream
 import com.example.mediremind.ui.theme.MediRemindTheme
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -128,7 +129,7 @@ fun DoseScheduleFormScreen(
                 onBackClick = onCancel
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MediCream
     ) { innerPadding ->
         LazyColumn(
             modifier = modifier
@@ -641,13 +642,16 @@ private fun buildEstimatedScheduleSummary(
     if (remindersPerDay <= 0) return null
 
     val startCalendar = parseDateValue(startDate) ?: return null
-    val estimatedDaysOfSupply = kotlin.math.ceil(stockAmount / remindersPerDay.toDouble()).toInt()
+    val dailyAmountUsed = (medication.amountPerDose * remindersPerDay)
+        .takeIf { it > 0.0 }
+        ?: remindersPerDay.toDouble()
+    val estimatedDaysOfSupply = kotlin.math.ceil(stockAmount / dailyAmountUsed).toInt()
     val estimatedEndCalendar = (startCalendar.clone() as Calendar).apply {
         add(Calendar.DAY_OF_YEAR, estimatedDaysOfSupply - 1)
     }
 
     val dosesUntilRefill = (stockAmount - refillAlertAt).coerceAtLeast(0.0)
-    val estimatedRefillDays = kotlin.math.floor(dosesUntilRefill / remindersPerDay.toDouble()).toInt()
+    val estimatedRefillDays = kotlin.math.floor(dosesUntilRefill / dailyAmountUsed).toInt()
     val refillCalendar = (startCalendar.clone() as Calendar).apply {
         add(Calendar.DAY_OF_YEAR, estimatedRefillDays)
     }

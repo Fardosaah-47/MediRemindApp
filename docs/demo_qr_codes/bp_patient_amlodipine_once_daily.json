@@ -10,6 +10,7 @@
       "times": [
         "09:00 AM"
       ],
+      "amountPerDose": 1,
       "stockAmount": 30,
       "stockUnit": "tablets",
       "refillAlertAt": 7

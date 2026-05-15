@@ -1,0 +1,21 @@
+{
+  "type": "mediremind_rx_v1",
+  "source": "MediRemind Demo Pharmacy",
+  "medications": [
+    {
+      "name": "Amoxicillin Syrup",
+      "form": "LIQUID",
+      "dosage": "250mg/5ml suspension - give 10ml three times daily",
+      "frequency": "THREE_TIMES_DAILY",
+      "times": [
+        "07:00 AM",
+        "02:00 PM",
+        "09:00 PM"
+      ],
+      "amountPerDose": 10,
+      "stockAmount": 150,
+      "stockUnit": "ml",
+      "refillAlertAt": 30
+    }
+  ]
+}

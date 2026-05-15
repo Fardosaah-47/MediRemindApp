@@ -14,6 +14,7 @@ The app imports medication QR codes with this shape:
       "dosage": "500mg tablet - take one tablet twice daily with meals",
       "frequency": "TWICE_DAILY",
       "times": ["08:00 AM", "08:00 PM"],
+      "amountPerDose": 1,
       "stockAmount": 60,
       "stockUnit": "tablets",
       "refillAlertAt": 10
@@ -49,6 +50,11 @@ docs/demo_qr_codes/
 - `pharmacy_bundle_two_meds.png`
   - Medication import QR with two medicines in one scan.
   - Useful for testing bulk import.
+
+- `syrup_amoxicillin_three_times_daily.png`
+  - Medication import QR for liquid medicine.
+  - Creates Amoxicillin Syrup, 10 ml per dose, three times daily.
+  - Useful for testing that stock subtracts 10 ml, not 1 unit.
 
 - `caregiver_report_sample.png`
   - Caregiver report QR.

@@ -45,7 +45,9 @@ import androidx.compose.ui.unit.dp
 import com.example.mediremind.data.model.UserProfile
 import com.example.mediremind.ui.components.InitialsAvatar
 import com.example.mediremind.ui.components.MediRemindTopBar
+import com.example.mediremind.ui.theme.MediCream
 import com.example.mediremind.ui.theme.MediRemindTheme
+import com.example.mediremind.ui.theme.MediSurfaceRaised
 
 @Composable
 fun PatientProfileScreen(
@@ -83,7 +85,7 @@ fun PatientProfileScreen(
                 onBackClick = onBackClick
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MediCream
     ) { innerPadding ->
         LazyColumn(
             modifier = modifier
@@ -195,7 +197,7 @@ fun PatientProfileScreen(
 
                     Card(
                         shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        colors = CardDefaults.cardColors(containerColor = MediSurfaceRaised),
                         elevation = CardDefaults.cardElevation(1.dp)
                     ) {
                         Column(
@@ -284,7 +286,7 @@ private fun PatientProfileRow(
             .fillMaxWidth()
             .clickable(onClick = onSwitch),
         shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = MediSurfaceRaised),
         elevation = CardDefaults.cardElevation(1.dp)
     ) {
         Row(
