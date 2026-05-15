@@ -1,6 +1,6 @@
 # MediRemind Build Board
 
-Last revised: 2026-05-13
+Last revised: 2026-05-15
 
 ## Current Truth
 
@@ -9,69 +9,75 @@ MediRemind now has a real offline medication loop:
 - [x] Patient profile creation/switching for local shared-device use
 - [x] Medication add/edit/delete
 - [x] QR medication import
+- [x] Demo QR payloads and PNGs for testing
 - [x] Auto-create schedules from medication frequency
 - [x] Schedule add/edit/delete
 - [x] Dose Log with Taken, Skipped, Snoozed, and Missed
 - [x] Live camera capture before confirming Taken
 - [x] Medication photo matching before Taken confirmation
 - [x] Stock decrement after confirmed Taken dose
+- [x] Dose amount per dose support, including liquids such as 10 ml syrup
+- [x] Refill reminders for low/out-of-stock medicine
 - [x] Patient report QR generation
 - [x] Caregiver scan/read flow
 - [x] Profile-scoped data separation using `patientId`
 - [x] 24-hour cleanup for verification photos
-- [x] Basic AlarmManager reminder engine
+- [x] AlarmManager reminder engine with sound/vibration/lock-screen behavior
+- [x] Adherence streak screen
 
 ## Important Warning For Next Reviewer
 
-The UI is still under design review.
+The core logic is now sendable for review. Do not do broad rewrites unless a real bug is found.
 
-Do not treat the current Home screen as final. The current design direction is:
+The main remaining risk is real-device behavior:
 
-- elderly-friendly
-- high contrast
-- fewer words
-- large buttons
-- simple colors
-- no decorative clutter that reduces readability
+- exact alarms on Samsung/Xiaomi battery settings
+- notification timing while the phone is locked or recently restarted
+- camera/photo matching under bad lighting
+- UI readability on smaller screens
 
-The user is actively comparing the app against a more polished FarmConnect-style app. Keep the logic stable and improve UI one screen at a time.
+Keep improvements cautious. Fix concrete bugs, confusing copy, overlap, or unreadable colors. Avoid redesigning the whole app before final testing.
 
-## Current Sprint: Stabilize Before Charts
+## Current Sprint: Friend Review And Final Phone Testing
 
-- [x] Fix Home progress counts so missed doses do not look like remaining doses
-- [x] Fix schedule edit reflection in Dose Log by clearing stale same-day auto-missed logs
-- [x] Add basic reminder scheduling with AlarmManager
-- [x] Register reminder receiver and boot receiver
-- [x] Request notification permission on supported Android versions
-- [x] Open Dose Log from reminder notification tap
-- [ ] Real-device test reminder firing
-- [ ] Upgrade reminder notification with sound/vibration/lock-screen behavior
-- [ ] Decide whether full-screen ringing alarm is in MVP or future work
-- [ ] Finish Home screen UI approval
-- [ ] Apply approved accessible design language to Dose Logging
-- [ ] Apply approved accessible design language to Medications
-- [ ] Apply approved accessible design language to Schedules
-- [ ] Apply approved accessible design language to Profile and Reports
+- [x] Push latest code to GitHub
+- [x] Add `amountPerDose` and Room v7 migration
+- [x] Update QR demo payloads with `amountPerDose`
+- [x] Add syrup QR demo for non-1-unit stock decrement
+- [x] Regenerate demo QR PNGs
+- [x] Update schedule estimate math to use amount per dose
+- [x] Apply light UI consistency to Profile and Schedule screens
+- [ ] Friend code review
+- [ ] Fresh install phone test
+- [ ] Existing install migration test from database v6 to v7
+- [ ] Real-device test alarms with screen on, screen off, and after reboot
+- [ ] Real-device test QR import using all demo QR PNGs
+- [ ] Real-device test stock decrement for tablets and syrup
 
 ## QR And Caregiver Flow
 
-- [x] QR import starts schedules from today when appropriate
+- [x] QR import starts schedules from the intended start date
 - [x] Imported medication can auto-schedule
+- [x] QR parser accepts `amountPerDose`, `doseAmount`, or `doseQuantity`
+- [x] Demo QR files exist in `docs/demo_qr_codes/`
+- [x] Mary Metformin QR
+- [x] BP patient Amlodipine QR
+- [x] Two-medicine pharmacy bundle QR
+- [x] Syrup Amoxicillin QR
+- [x] Caregiver report sample QR
+- [x] QR import screen wording simplified for low-literacy users
 - [x] Caregiver report QR uses a bounded recent-report approach
 - [x] QR generation failure is guarded instead of crashing
-- [ ] Test QR import with realistic hospital/pharmacy payloads
-- [ ] Create sample QR payloads for demo personas
-- [ ] Simplify QR import screen wording for low-literacy users
-- [ ] Simplify caregiver report wording for quick scanning
+- [ ] Test caregiver scan on two physical phones
 
 ## Profile / Multiple Patient Scope
 
 - [x] Support multiple local profiles on one shared device
 - [x] Active patient controls visible Home/report/QR context
-- [x] Medications and schedules are patient-scoped
+- [x] Medications, schedules, and logs are patient-scoped
 - [x] QR imports attach to active patient
 - [ ] Real-device test Mary + second patient + QR imported patient
-- [ ] Add clearer UI copy for active patient vs edit patient
+- [ ] Confirm alarm notification clearly includes patient name
 - [ ] Future work: optional PIN/biometric caregiver mode
 
 ## Reminder Engine
@@ -83,22 +89,27 @@ The user is actively comparing the app against a more polished FarmConnect-style
   - [x] `POST_NOTIFICATIONS`
   - [x] `SCHEDULE_EXACT_ALARM`
   - [x] `RECEIVE_BOOT_COMPLETED`
+  - [x] `VIBRATE`
+  - [x] `USE_FULL_SCREEN_INTENT`
+  - [x] `WAKE_LOCK`
 - [x] Schedule alarms after medication/schedule/QR saves
+- [x] Cancel dose notification when a dose is logged
 - [x] Cancel alarms on medication delete
 - [x] Reschedule alarms after boot
-- [ ] Real-device test exact alarm behavior
-- [ ] Add sound and vibration
-- [ ] Add notification category/visibility settings
-- [ ] Consider full-screen alarm screen after normal reminder works
-- [ ] Add refill reminder alarms
+- [x] Sound/vibration/lock-screen reminder behavior
+- [ ] Real-device test exact alarm behavior under battery optimization
+- [ ] Document battery unrestricted setting for Samsung/Xiaomi if needed
 
 ## Refill / Stock
 
 - [x] Decrement stock after confirmed Taken dose
 - [x] Guard against double deduction
-- [ ] Support dose amount other than 1 unit
-- [ ] Recompute refill estimates from actual taken logs
-- [ ] Add refill reminders
+- [x] Support dose amount other than 1 unit
+- [x] Show remaining stock in medicine and dose logging flows
+- [x] Add refill reminder alarms
+- [x] Immediate low-stock/out-of-stock notification behavior
+- [ ] Test refill alert threshold with a small-stock medication
+- [ ] Future work: recompute refill estimates from long-term actual logs
 
 ## Photo Verification
 
@@ -112,56 +123,50 @@ The user is actively comparing the app against a more polished FarmConnect-style
 
 ## UI Design To-Do
 
-Use this strict design system unless a final Figma design replaces it:
+Current direction:
 
-- Background: `#F7F9FB`
-- Primary: `#2F80ED`
-- Success: `#27AE60`
-- Alert: `#EB5757`
-- Text: `#222222`
+- warm healthcare background
+- purple primary actions
+- green for taken/success
+- red for missed/problem
+- orange for snooze/upcoming/refill warning
+- blue for QR/report/info
+- large readable labels and touch targets
+- no color-only meaning
 
-Rules:
+Screen checks still needed:
 
-- [ ] High contrast text everywhere
-- [ ] Icons plus labels, not icons alone
-- [ ] Large buttons and touch targets
-- [ ] No color-only status meaning
-- [ ] No light gray text for important info
-- [ ] No gradients/neon unless explicitly approved
-- [ ] Keep Home bottom navigation stable unless user explicitly asks
-
-Screen order:
-
-1. Home
-2. Dose Logging
-3. Medications
-4. Schedules
-5. Profile
-6. QR Import
-7. Patient Report
-8. Caregiver Scan
+- [ ] Home: no overlap on small screens
+- [ ] Dose Logging: readable stock chips and action buttons
+- [ ] Medications: remaining stock and low-stock badges clear
+- [ ] Schedules: matches app theme and dates are understandable
+- [ ] Profile: active/use/edit wording is clear
+- [ ] QR Import: elderly-friendly wording
+- [ ] Patient Report: easy for caregiver to read
+- [ ] Caregiver Scan: result screen is clear
 
 ## Final Demo Personas
 
-- [ ] Mary Achieng: diabetic, Metformin twice daily
-- [ ] Second patient: daily blood pressure medicine
-- [ ] QR-import patient: medication loaded without typing
+- [x] Mary Achieng: diabetic, Metformin twice daily
+- [x] Second patient: daily blood pressure medicine
+- [x] Syrup patient: Amoxicillin 10 ml three times daily
+- [x] QR-import patient: medication loaded without typing
 - [ ] Caregiver scan flow: patient phone generates report, caregiver scans it
 
 ## Last-Minute Cuts If Time Is Bad
 
 Cut in this order:
 
-1. Charts
-2. Streaks
-3. Full-screen ringing alarm
-4. Extra caregiver simulator features
-5. Fancy animations
+1. Fancy UI animations
+2. Extra charts
+3. Extra caregiver simulator features
+4. Optional PIN/biometric caregiver mode
+5. Cloud/hospital integration
 
 Do not cut:
 
 1. Medication CRUD
-2. Profile-scoped medication/schedules
+2. Profile-scoped medication/schedules/logs
 3. QR import
 4. Dose logging
 5. Reminder notifications

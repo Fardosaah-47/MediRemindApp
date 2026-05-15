@@ -1,5 +1,7 @@
 # MediRemind Review Handoff
 
+Last revised: 2026-05-15
+
 ## Project Overview
 
 MediRemind is an offline-first Android medication support app built in Kotlin with Jetpack Compose and Room.
@@ -9,57 +11,55 @@ The target users are:
 - elderly patients
 - low-literacy patients
 - caregivers who need a simple adherence summary
+- households where one phone may be shared by more than one patient
 
 The project focus is:
 
-- local medication setup
+- local patient profile separation
+- medication setup by manual entry or QR scan
 - dose scheduling
 - daily logging
 - refill awareness
 - live photo-based dose confirmation
+- reminder alarms
 - offline caregiver QR sharing
 
-The app is intentionally designed to work without requiring internet for the patient workflow.
+The patient workflow is intentionally designed to work without internet.
 
 ## Current Build Status
 
-The current project already has a real working local flow and is no longer just UI mockups.
+The current project has a working local flow and is sendable for code review.
 
 Implemented major areas:
 
 - medication CRUD
 - schedule CRUD
 - Room persistence
+- Room v7 migration for `amountPerDose`
 - QR medication import flow
-- dose logging with `Taken`, `Skipped`, and `Snoozed`
+- demo QR payloads and PNGs in `docs/demo_qr_codes/`
+- dose logging with `Taken`, `Skipped`, `Snoozed`, and `Missed`
 - missed-dose rollover logic
 - live captured proof-photo flow for `Taken`
 - reference photo vs captured photo similarity check
+- stock decrement after Taken, using the real amount per dose
+- refill reminder notifications
 - patient QR report generation
 - caregiver QR scan and report reading
 - grouped history and grouped schedule display
-- patient profile save/load
-- dashboard-style home screen
-
-Not fully implemented yet:
-
-- timed refill notifications
-- release APK / final documentation screenshots
-
-Recently added but still needs real-device testing:
-
-- basic Android reminder engine with `AlarmManager`
-- notification channel and reminder receiver
-- boot receiver for rescheduling
-- runtime notification permission request
+- multiple local patient profiles
+- profile-scoped medications, schedules, and logs
+- AlarmManager reminder engine
+- sound/vibration/lock-screen notification behavior
 - notification tap opens Dose Log
+- boot receiver for rescheduling
+- adherence streak screen
 
-Current UI warning:
+Remaining work before final submission:
 
-- the Home screen is still under active visual review
-- do not treat the current Home card styling as final
-- preserve logic/navigation while iterating visually
-- the user wants elderly-friendly, high-contrast, low-clutter UI
+- full real-device testing
+- UI readability pass on all screens
+- final screenshots and report/user manual writing
 
 ## Tech Stack
 
@@ -68,15 +68,17 @@ Current UI warning:
 - Room
 - Coroutines
 - ML Kit Code Scanner
+- AlarmManager
+- Notification channels
 - local file storage via `FileProvider`
 
 ## Core Data Model
 
 ### UserProfile
 
-Stores the patient identity and caregiver information used in the app and in caregiver reports.
+Stores local patient identity and caregiver details.
 
-Current key fields:
+Key fields:
 
 - full name
 - age
@@ -85,37 +87,41 @@ Current key fields:
 
 ### Medication
 
-Stores the medicine setup and refill-related details.
+Stores medicine setup and refill details.
 
-Current key fields:
+Key fields:
 
+- patient ID
 - name
 - form
 - dosage instructions
-- stock amount
+- amount per dose
+- current stock amount
 - stock unit
 - refill threshold
 - reference image URI
+- QR-import flag
 
 ### DoseSchedule
 
 Stores schedule timing and treatment period data.
 
-Current key fields:
+Key fields:
 
+- patient ID
 - medication ID
 - frequency
 - time
 - start date
 - end date
-- active state
 
 ### DoseLog
 
 Stores actual dose behavior and verification output.
 
-Current key fields:
+Key fields:
 
+- patient ID
 - medication ID
 - schedule ID
 - status
@@ -130,130 +136,104 @@ Current key fields:
 
 Purpose:
 
-- gives the patient a clearer starting point
-- shows summary counts
-- suggests the next best step
+- gives the patient a clear starting point
+- shows daily progress
+- opens the major app sections
 
 Current behavior:
 
-- shows patient name if saved
-- shows medication count
-- shows schedule count
-- shows doses due today
-- shows doses logged today
-- shows the expected app flow in simple language
-- opens the main app sections from one place
-
-Expected user journey:
-
-1. save patient profile
-2. add medication
-3. set schedule
-4. log doses
-5. review reports
-
-## 2. Patient Profile
-
-Purpose:
-
-- saves the active local patient identity
-- improves caregiver reporting quality
-
-Current behavior:
-
-- create or update one local patient profile
-- save patient name, age, condition, and caregiver name
-- loads the saved profile back into app state
+- shows active patient name
+- shows today progress
+- separates logged, missed, and remaining doses
+- opens QR, report, medications, schedule, profile, and dose logging flows
 
 Current limitation:
 
-- profile model is still simple and should later expand with more health details if needed
+- UI needs final small-screen readability testing.
+
+## 2. Patient Profiles
+
+Purpose:
+
+- support shared household phone use
+- keep patient data separated locally
+
+Current behavior:
+
+- create/update profiles
+- switch active patient
+- active patient controls medications, schedules, logs, reports, and QR imports
+
+Security note:
+
+- this MVP uses device-level privacy rather than per-profile passwords.
+- optional PIN/biometric caregiver mode is future work.
 
 ## 3. Medication Setup
 
 Purpose:
 
-- manually add or edit a medication
-- support refill tracking and verification setup
+- manually add or edit medicine
+- support refill tracking
+- save reference photo for later verification
 
 Current behavior:
 
-- save medication details locally
-- allow edit of existing medication
-- allow delete with safeguards already being introduced in the app flow
-- save a reference photo of the real medication pack or bottle
-
-Why reference photo matters:
-
-- it is used during the `Taken` flow to reduce false logging
+- saves name, form, dosage, frequency, stock, unit, refill threshold, and amount per dose
+- amount per dose is used when stock decrements
+- QR-imported medicines protect core pharmacy fields unless unlocked
 
 ## 4. Medication List
 
 Purpose:
 
-- show saved medicines in one place
-- support opening a medicine for review or editing
+- show saved medicines and remaining stock
+- support opening/editing a medicine
 
 Current behavior:
 
-- lists added medications
-- allows entering add flow
-- supports edit flow
-
-Current limitation:
-
-- this screen can still be improved visually and navigationally so it feels more like a finished cabinet view
+- medicine cards show stock, low-stock state, source, dosage, and form
+- refill warnings are tied to stock values
 
 ## 5. Dose Schedules
 
 Purpose:
 
-- define how often and when medication should be taken
-- support treatment period planning
+- define dose times and treatment period
+- support editing reminder times
 
 Current behavior:
 
-- schedule medications with frequency and time
-- group schedule entries by medication for cleaner viewing
-- archive outdated schedules instead of leaving them all active
-- try to sync schedules when medication details are edited or imported
-- estimate treatment period and refill timing from stock and schedule data
-
-Current limitation:
-
-- schedule sync rules are still being hardened to avoid accidental duplication or mismatch
+- schedule medications by frequency/time
+- group schedule entries by medication
+- update stale same-day missed logs when times are edited
+- estimate supply/refill timing using amount per dose
+- new medication schedules start the following day by default
 
 ## 6. Dose Logging
 
 Purpose:
 
-- act as the daily working screen for adherence
+- daily working screen for adherence
 
 Current behavior:
 
-- shows what is still remaining today
-- shows what has already been logged today
-- supports `Taken`, `Skipped`, and `Snoozed`
-- automatically rolls older overdue doses into missed history
-- groups repeated history entries by medication/date so the screen is not too noisy
-- uses rolling history ranges instead of awkward calendar-only grouping
+- shows remaining today
+- shows logged today
+- shows missed/skipped/snoozed states
+- supports camera verification before confirming Taken
+- cancels the active dose notification when the dose is logged
+- decrements stock only once per schedule/date Taken log
 
 ### Current Taken Flow
 
-1. user taps `Taken`
+1. user taps Taken/log dose
 2. app launches live camera capture
-3. app compares the live captured image with the saved medication reference image
-4. app calculates a similarity score
-5. confirmation is only allowed when the match looks likely enough
-6. the saved verification image is linked to the `DoseLog`
-
-Why this exists:
-
-- to reduce the problem of a patient falsely claiming they took medicine
-
-Current limitation:
-
-- the similarity check is a practical student-project safeguard, not medical-grade recognition
+3. app compares captured image with saved reference image
+4. app shows match status
+5. confirmed Taken creates the log
+6. stock decreases by `amountPerDose`
+7. low-stock/refill logic is evaluated
 
 ## 7. Import By QR
 
@@ -263,16 +243,19 @@ Purpose:
 
 Current behavior:
 
-- scans pharmacy or hospital QR input
-- parses supported medication payloads
+- scans supported pharmacy/hospital medication QR payloads
 - saves or updates medication data
-- can influence schedules based on imported content
-- shows import status and raw scan preview for testing
+- creates schedules automatically
+- supports `amountPerDose`, `doseAmount`, or `doseQuantity`
+- uses simpler wording for elderly users
 
-Current limitation:
+Demo files:
 
-- QR input testing still needs more real payload trials
-- imported-field restrictions and review flow can still be refined further
+- `mary_metformin_twice_daily.png`
+- `bp_patient_amlodipine_once_daily.png`
+- `pharmacy_bundle_two_meds.png`
+- `syrup_amoxicillin_three_times_daily.png`
+- `caregiver_report_sample.png`
 
 ## 8. Patient Report
 
@@ -284,13 +267,8 @@ Current behavior:
 
 - shows patient summary stats
 - shows adherence percentage
-- shows grouped medication breakdown
-- generates a QR bitmap for caregiver scanning
-
-Current use:
-
-- patient opens this screen
-- caregiver scans from another device running MediRemind
+- shows medication breakdown
+- generates bounded QR content so very large reports do not crash QR generation
 
 ## 9. Caregiver Scan
 
@@ -300,133 +278,139 @@ Purpose:
 
 Current behavior:
 
-- scans the patient report QR
-- parses the caregiver summary payload
-- shows patient stats and grouped medication breakdown
+- scans patient report QR
+- parses caregiver summary payload
+- shows patient stats and medication breakdown
 
-Current limitation:
+## 10. Reminder And Refill Notifications
 
-- visual polish improved, but caregiver explanation can still be simplified further if needed
+Purpose:
+
+- remind patient at the scheduled dose time
+- warn patient/caregiver when stock is low
+
+Current behavior:
+
+- schedules dose reminders with AlarmManager
+- notification has sound/vibration/lock-screen behavior
+- notification opens Dose Log
+- boot receiver reschedules alarms after restart
+- low-stock and out-of-stock refill notifications exist
+
+Real-device note:
+
+- Samsung/Xiaomi battery optimization may delay exact alarms unless the app is set to unrestricted battery use.
 
 ## What Has Been Refined Recently
 
-Recent refinement work includes:
+Recent work includes:
 
-- separated patient report and caregiver scan into different flows
-- grouped dose history by medication instead of repeating cards noisily
-- improved schedule syncing from medication details
-- improved missed-dose rollover behavior
-- improved home dashboard so it is not just random buttons
-- improved patient profile usage
-- improved patient report, caregiver scan, and QR import presentation
-- added basic `AlarmManager` reminder scheduler/receiver/boot receiver
-- added notification permission request
-- added schedule-edit cleanup so Dose Log reflects edited same-day times
-- added accessibility-oriented theme tokens, but final visual direction is still under review
+- added ringing reminder behavior
+- added refill reminder scheduler
+- added adherence streak screen
+- added `amountPerDose` with Room v7 migration
+- updated stock decrement and schedule estimates to use amount per dose
+- added syrup QR demo for liquid medicine
+- regenerated QR demo PNGs
+- simplified QR import wording
+- lightly aligned Profile and Schedule screens with the warmer app theme
+- pushed all changes to GitHub
 
 ## Current Strengths
 
-- local/offline-first architecture is real
+- offline-first architecture is real
+- profile-scoped data separation is implemented
+- QR import helps low-literacy users avoid typing
 - main medication workflow works end to end
-- app already stores real data in Room
-- photo verification flow exists
+- stock/refill logic now handles non-tablet amounts
+- reminder engine exists
 - caregiver QR flow exists
-- history and schedule views are cleaner than before
+- photo verification flow exists
 
 ## Known Weaknesses / Gaps
 
-### 1. Reminder Engine Exists But Needs Real-Device Testing
+### 1. Real-Device Testing Still Matters
 
-Implemented:
+Needs testing on physical devices:
 
-- `MedicationAlarmScheduler`
-- `MedicationAlarmReceiver`
-- `MedicationBootReceiver`
-- manifest permissions for notifications, exact alarms, and boot
-- notification tap opens Dose Log
-- alarms are scheduled after medication/schedule/QR saves
+- alarms while screen is off
+- alarms after reboot
+- QR scanning under normal phone camera conditions
+- photo matching under different backgrounds/lighting
+- stock decrement and refill notification thresholds
+- multi-profile switching with scheduled alarms
 
-Still missing:
+### 2. UI Is Still The Main Polish Risk
 
-- real-device verification that reminders fire reliably
-- sound/vibration/lock-screen behavior
-- refill reminder scheduling
-- decision on full-screen alarm screen
+The UI is functional but still needs a final readability pass.
 
-### 2. Refill Logic Needs Harder Coupling To Real Logs
+Review for:
 
-The app decrements stock after a confirmed Taken dose. Later it should support dose amounts other than 1 unit and rely more strongly on actual taken-dose behavior for refill timing.
+- overlapping text
+- low contrast
+- crowded chips
+- bottom navigation spacing
+- confusing labels for elderly users
 
-### 3. UI Is The Main Active Risk
+### 3. Documentation Is Not Final
 
-The current UI is not final. The user is actively reviewing Home screen styling. Claude should improve visual clarity cautiously, one screen at a time, without changing navigation or logic.
+Still needed:
 
-Preferred design rules for the current pass:
-
-- background `#F7F9FB`
-- primary `#2F80ED`
-- success `#27AE60`
-- alert `#EB5757`
-- text `#222222`
-- icons plus text labels
-- large tap targets
-- high contrast
-- no color-only status meaning
-
-### 4. QR And Persona Testing Still Needed
-
-Need test passes for:
-
-- Mary Achieng: diabetic, twice daily
-- second patient: one daily blood pressure medicine
-- QR imported patient: medication loaded by scan
-- caregiver report scan flow
+- final screenshots
+- user manual steps
+- report chapters explaining QR, profiles, reminders, and privacy-by-device-lock
+- future work section
 
 ## Recommended Next Build Order
 
 ### Immediate
 
-- real-device test current alarm notification behavior
-- finish Home screen visual approval
-- apply approved accessibility design to Dose Logging
-- test QR import with realistic payloads
+- let friend review GitHub repo
+- run full phone test using demo QR codes
+- fix only concrete bugs or obvious readability problems
 
 ### Next
 
-- upgrade reminder sound/vibration
-- add refill reminders
-- refine caregiver report wording
+- final UI consistency pass
+- final demo script
+- screenshots for report
 
 ### Later
 
 - release APK
-- report screenshots
+- optional PIN/biometric caregiver mode
+- richer charts
+- cloud/hospital QR integration
 
 ## What To Review In Code First
 
-If you are reviewing the codebase quickly, start with:
+If reviewing quickly, start with:
 
 - `MainActivity.kt`
-- `data/repository/`
-- `ui/screen/home/`
+- `data/model/Medication.kt`
+- `data/local/AppDatabaseProvider.kt`
+- `data/repository/QrImportParser.kt`
+- `domain/MedicationAlarmScheduler.kt`
+- `domain/RefillAlarmScheduler.kt`
+- `ui/screen/reminder/`
 - `ui/screen/medication/`
 - `ui/screen/schedule/`
-- `ui/screen/reminder/`
 - `ui/screen/profile/`
 
 ## Summary
 
 MediRemind currently offers a real offline patient workflow:
 
-- create patient profile
-- add medication
-- set schedule
+- create/switch patient profile
+- add or scan medication
+- auto-create schedules
+- receive reminders
 - log doses
-- verify taken doses with a live photo
-- review dose history
+- verify taken doses with live photo
+- decrement stock correctly
+- receive refill warnings
+- review adherence/streaks
 - generate caregiver QR summary
 - scan caregiver summary on another device
 
-The biggest engineering risk is now real-device reminder reliability, not the existence of the reminder engine.
-
-The biggest current design goal is to make the working screens elderly-friendly and visually coherent without breaking the stable core already built.
+The biggest risk now is not missing core code. It is final real-device testing and UI readability.
