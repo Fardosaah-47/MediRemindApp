@@ -60,6 +60,7 @@ object QrImportParser {
                             name = item.optString("name").ifBlank { "Untitled Medication" },
                             form = parseMedicationForm(item.optString("form")),
                             dosage = item.optString("dosage").ifBlank { "Not specified" },
+                            amountPerDose = parseAmountPerDose(item),
                             currentStockAmount = item.optDouble("stockAmount", 0.0),
                             stockUnit = item.optString("stockUnit").ifBlank { "units" },
                             refillAlertAt = item.optDouble("refillAlertAt", 0.0),
@@ -98,6 +99,16 @@ object QrImportParser {
             "AS_NEEDED" -> DoseFrequency.AS_NEEDED
             else -> DoseFrequency.ONCE_DAILY
         }
+    }
+
+    private fun parseAmountPerDose(item: JSONObject): Double {
+        val amount = when {
+            item.has("amountPerDose") -> item.optDouble("amountPerDose", 1.0)
+            item.has("doseAmount") -> item.optDouble("doseAmount", 1.0)
+            item.has("doseQuantity") -> item.optDouble("doseQuantity", 1.0)
+            else -> 1.0
+        }
+        return amount.takeIf { it > 0.0 } ?: 1.0
     }
 
     private fun extractJsonPayload(rawValue: String): String {

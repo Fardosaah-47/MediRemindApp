@@ -713,12 +713,12 @@ class MainActivity : ComponentActivity() {
                                     val rawValue = barcode.rawValue
                                     if (rawValue.isNullOrBlank()) {
                                         qrRawPreview = "No readable QR content."
-                                        qrImportMessage = "QR scan succeeded, but the code had no readable content."
+                                        qrImportMessage = "We could not read that code. Try scanning again."
                                         return@addOnSuccessListener
                                     }
 
                                     qrRawPreview = rawValue
-                                    qrImportMessage = "QR captured. Trying to import..."
+                                    qrImportMessage = "Code found. Saving the medicine..."
 
                                     coroutineScope.launch {
                                         try {
@@ -744,27 +744,27 @@ class MainActivity : ComponentActivity() {
                                                 selectedMedication = importedMedication
                                                 medicationReferenceImageUri = importedMedication?.referenceImageUri
                                                 qrImportMessage =
-                                                    "QR import complete. Review the medication, take its reference photo, and keep the pharmacy details locked unless you truly need to change them."
+                                                    "Medicine saved. Check the details, then add a medicine photo."
                                                 currentScreen = AppScreen.MEDICATION_FORM
                                             } else {
                                                 qrImportMessage =
-                                                    "QR import complete. ${importResult.insertedMedicationIds.size} medication record(s) and ${importResult.autoScheduledCount} reminder time(s) were loaded."
+                                                    "${importResult.insertedMedicationIds.size} medicines saved with ${importResult.autoScheduledCount} reminder times."
                                                 currentScreen = AppScreen.MEDICATION_LIST
                                             }
                                         } catch (error: Exception) {
                                             qrImportMessage =
-                                                error.message ?: "QR import failed. Check the QR format and try again."
+                                                error.message ?: "This code did not work. Try again or add the medicine by hand."
                                         }
                                     }
                                 }
                                 .addOnCanceledListener {
                                     qrRawPreview = "QR scan canceled."
-                                    qrImportMessage = "QR scan was canceled."
+                                    qrImportMessage = "Scan canceled."
                                 }
                                 .addOnFailureListener { error ->
                                     qrRawPreview = "QR scan failed before content was captured."
                                     qrImportMessage =
-                                        error.message ?: "QR scan failed. Try again."
+                                        error.message ?: "Scan failed. Try again."
                                 }
                         },
                         caregiverReportSummary = caregiverReportSummary,
@@ -1678,8 +1678,11 @@ private fun calculateEndDateFromMedication(
     startDate: String
 ): String {
     val remindersPerDay = countReminderSlotsForFrequency(frequency).coerceAtLeast(1)
+    val dailyAmountUsed = (medication.amountPerDose * remindersPerDay)
+        .takeIf { it > 0.0 }
+        ?: remindersPerDay.toDouble()
     val estimatedDaysOfSupply = kotlin.math.ceil(
-        medication.currentStockAmount / remindersPerDay.toDouble()
+        medication.currentStockAmount / dailyAmountUsed
     ).toInt().coerceAtLeast(1)
     return plusDays(startDate, estimatedDaysOfSupply - 1)
 }
@@ -1826,8 +1829,9 @@ private suspend fun decrementMedicationStock(
     ) ?: return
     if (medication.currentStockAmount <= 0.0) return
 
+    val amountUsed = medication.amountPerDose.takeIf { it > 0.0 } ?: 1.0
     val updatedMedication = medication.copy(
-        currentStockAmount = (medication.currentStockAmount - 1.0).coerceAtLeast(0.0)
+        currentStockAmount = (medication.currentStockAmount - amountUsed).coerceAtLeast(0.0)
     )
     medicationRepository.updateMedication(updatedMedication)
     RefillAlarmScheduler.evaluateAndSchedule(

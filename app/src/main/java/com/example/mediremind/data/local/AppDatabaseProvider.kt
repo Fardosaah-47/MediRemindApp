@@ -67,6 +67,14 @@ object AppDatabaseProvider {
         }
     }
 
+    private val MIGRATION_6_7 = object : Migration(6, 7) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL(
+                "ALTER TABLE medications ADD COLUMN amountPerDose REAL NOT NULL DEFAULT 1.0"
+            )
+        }
+    }
+
     fun getDatabase(context: Context): AppDatabase {
         return INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
@@ -79,6 +87,7 @@ object AppDatabaseProvider {
                 .addMigrations(MIGRATION_3_4)
                 .addMigrations(MIGRATION_4_5)
                 .addMigrations(MIGRATION_5_6)
+                .addMigrations(MIGRATION_6_7)
                 .build()
                 .also { INSTANCE = it }
         }

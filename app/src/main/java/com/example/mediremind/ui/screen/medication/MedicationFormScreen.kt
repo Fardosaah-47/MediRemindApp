@@ -75,6 +75,9 @@ fun MedicationFormScreen(
     val dosage = remember(existingMedication?.id) {
         mutableStateOf(existingMedication?.dosage.orEmpty())
     }
+    val amountPerDose = remember(existingMedication?.id) {
+        mutableStateOf(formatAmountForField(existingMedication?.amountPerDose ?: 1.0))
+    }
     val selectedFrequency = remember(existingMedication?.id) {
         mutableStateOf(inferFrequencyFromDosage(existingMedication?.dosage.orEmpty()))
     }
@@ -295,6 +298,12 @@ fun MedicationFormScreen(
                             )
                         }
                         FormField(
+                            value = amountPerDose.value,
+                            onValueChange = { amountPerDose.value = it },
+                            label = "Amount taken each dose",
+                            readOnly = areProtectedQrFieldsReadOnly
+                        )
+                        FormField(
                             value = refillAlertAt.value,
                             onValueChange = { refillAlertAt.value = it },
                             label = "Alert when stock reaches"
@@ -355,6 +364,9 @@ fun MedicationFormScreen(
                                     name = medicationName.value.ifBlank { "Untitled Medication" },
                                     form = parseMedicationForm(medicationForm.value),
                                     dosage = dosageWithFrequency,
+                                    amountPerDose = amountPerDose.value.toDoubleOrNull()
+                                        ?.takeIf { it > 0.0 }
+                                        ?: 1.0,
                                     currentStockAmount = stockAmount.value.toDoubleOrNull() ?: 0.0,
                                     stockUnit = stockUnit.value.ifBlank { "units" },
                                     refillAlertAt = refillAlertAt.value.toDoubleOrNull() ?: 0.0,
@@ -557,6 +569,14 @@ private fun deleteReasonOptions(): List<String> {
         "Wrong medication",
         "No longer prescribed"
     )
+}
+
+private fun formatAmountForField(value: Double): String {
+    return if (value % 1.0 == 0.0) {
+        value.toInt().toString()
+    } else {
+        value.toString()
+    }
 }
 
 @Composable

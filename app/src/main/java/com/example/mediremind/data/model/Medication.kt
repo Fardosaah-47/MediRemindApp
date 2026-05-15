@@ -15,6 +15,7 @@ data class Medication(
     val name: String,
     val form: MedicationForm,
     val dosage: String,
+    val amountPerDose: Double = 1.0,
     val currentStockAmount: Double,
     val stockUnit: String,
     val refillAlertAt: Double,

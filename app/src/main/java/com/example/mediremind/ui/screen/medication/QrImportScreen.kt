@@ -45,7 +45,7 @@ import com.example.mediremind.ui.theme.MediRemindTheme
 fun QrImportScreen(
     modifier: Modifier = Modifier,
     activePatientName: String = "Patient profile not set",
-    importMessage: String = "Scan a hospital or pharmacy QR code to load medication details.",
+    importMessage: String = "Scan the medicine code to add it without typing.",
     rawScanPreview: String = "No QR scanned yet.",
     onScanQrClick: () -> Unit = {},
     onBackClick: () -> Unit = {}
@@ -53,7 +53,7 @@ fun QrImportScreen(
     Scaffold(
         topBar = {
             MediRemindTopBar(
-                title = "Import by QR",
+                title = "Scan Medicine QR",
                 onBackClick = onBackClick
             )
         },
@@ -84,7 +84,7 @@ fun QrImportScreen(
                         )
                         Column {
                             Text(
-                                text = "Selected patient",
+                                text = "Saving for",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.72f)
                             )
@@ -131,7 +131,7 @@ fun QrImportScreen(
                             )
                         }
                         Text(
-                            text = "Scan a pharmacy QR to fill medication details instantly.",
+                            text = "Point your phone at the square code on the medicine packet. The app will add the medicine for you.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f)
                         )
@@ -142,14 +142,14 @@ fun QrImportScreen(
                         ) {
                             Icon(Icons.Outlined.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = "Scan Pharmacy QR", style = MaterialTheme.typography.labelLarge)
+                            Text(text = "Scan Code", style = MaterialTheme.typography.labelLarge)
                         }
                     }
                 }
             }
 
             item {
-                SectionLabel("What the QR can fill")
+                SectionLabel("What gets saved")
                 Spacer(modifier = Modifier.height(8.dp))
                 Card(
                     shape = RoundedCornerShape(18.dp),
@@ -157,31 +157,31 @@ fun QrImportScreen(
                     elevation = CardDefaults.cardElevation(1.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        QrInfoRow(icon = Icons.Outlined.Medication, text = "Medication name, form, and dosage")
-                        QrInfoRow(icon = Icons.Outlined.Inventory2, text = "Stock amount and refill alert level")
-                        QrInfoRow(icon = Icons.Outlined.Schedule, text = "Frequency, reminder times, and treatment period")
+                        QrInfoRow(icon = Icons.Outlined.Medication, text = "Medicine name and dose")
+                        QrInfoRow(icon = Icons.Outlined.Inventory2, text = "How much stock is left")
+                        QrInfoRow(icon = Icons.Outlined.Schedule, text = "Reminder times")
                     }
                 }
             }
 
             item {
-                SectionLabel("What happens next")
+                SectionLabel("Simple steps")
                 Spacer(modifier = Modifier.height(8.dp))
                 Card(
                     shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        NumberedStepRow("1", "Scan the pharmacy or hospital QR code.")
-                        NumberedStepRow("2", "MediRemind saves or updates the medication automatically.")
-                        NumberedStepRow("3", "Review the medication and add a real reference photo.")
+                        NumberedStepRow("1", "Find the square code.")
+                        NumberedStepRow("2", "Hold the phone over it.")
+                        NumberedStepRow("3", "Check the details and save a medicine photo.")
                     }
                 }
             }
 
-            if (importMessage.isNotBlank() && importMessage != "Scan a hospital or pharmacy QR code to load medication details.") {
+            if (importMessage.isNotBlank() && importMessage != "Scan the medicine code to add it without typing.") {
                 item {
-                    SectionLabel("Import status")
+                    SectionLabel("Scan result")
                     Spacer(modifier = Modifier.height(8.dp))
                     Card(
                         shape = RoundedCornerShape(14.dp),
@@ -194,31 +194,6 @@ fun QrImportScreen(
                         ) {
                             Icon(Icons.Outlined.TaskAlt, contentDescription = null, tint = ClinicTeal, modifier = Modifier.size(18.dp))
                             Text(importMessage, style = MaterialTheme.typography.bodyMedium, color = ClinicTeal)
-                        }
-                    }
-                }
-            }
-
-            if (rawScanPreview.isNotBlank() && rawScanPreview != "No QR scanned yet.") {
-                item {
-                    SectionLabel("Raw QR preview")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Card(
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Text(
-                                text = "Testing info only. This helps confirm what the scanner actually read.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = rawScanPreview,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
                     }
                 }
