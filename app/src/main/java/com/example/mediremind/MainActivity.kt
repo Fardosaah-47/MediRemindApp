@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -326,6 +327,49 @@ class MainActivity : ComponentActivity() {
                         CaregiverReportQrBuilder.generateQrBitmap(summary.qrPayload)?.asImageBitmap()
                     } else {
                         null
+                    }
+                }
+            }
+
+            BackHandler(enabled = showStartupSplash || currentScreen != AppScreen.HOME) {
+                if (showStartupSplash) {
+                    showStartupSplash = false
+                    return@BackHandler
+                }
+
+                when (currentScreen) {
+                    AppScreen.HOME -> Unit
+                    AppScreen.MEDICATION_LIST,
+                    AppScreen.SCHEDULE_LIST,
+                    AppScreen.QR_IMPORT,
+                    AppScreen.PROFILE,
+                    AppScreen.PATIENT_REPORT,
+                    AppScreen.CAREGIVER_SCAN,
+                    AppScreen.ADHERENCE -> {
+                        currentScreen = AppScreen.HOME
+                    }
+                    AppScreen.MEDICATION_FORM -> {
+                        selectedMedication = null
+                        medicationReferenceImageUri = null
+                        currentScreen = AppScreen.MEDICATION_LIST
+                    }
+                    AppScreen.SCHEDULE_FORM -> {
+                        selectedSchedule = null
+                        currentScreen = AppScreen.SCHEDULE_LIST
+                    }
+                    AppScreen.DOSE_LOGGING -> {
+                        pendingDoseVerification?.let { verification ->
+                            applicationContext.contentResolver.delete(
+                                Uri.parse(verification.capturedImageUri),
+                                null,
+                                null
+                            )
+                        }
+                        pendingDoseVerification = null
+                        pendingTakenDose = null
+                        pendingVerificationUri = null
+                        doseLoggingMessage = ""
+                        currentScreen = AppScreen.HOME
                     }
                 }
             }
